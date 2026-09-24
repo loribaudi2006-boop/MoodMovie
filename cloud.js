@@ -12,12 +12,9 @@
    for Google identity — no data from either app is stored there or
    shared between them.
 
-   Sign-in uses signInWithRedirect, not signInWithPopup — an
-   installed/standalone iOS PWA can't actually open a popup at all
-   (window.open() is a silent no-op there). Redirect only works reliably
-   because /__/auth/* is proxied through this app's own domain (see
-   netlify.toml) and authDomain below points at that same domain —
-   otherwise Safari's storage partitioning breaks the handshake.
+   Sign-in usa signInWithPopup: funziona su tutti i browser desktop
+   e mobile moderni senza bisogno di proxy /__/auth/*.
+   authDomain punta al dominio Firebase nativo del progetto.
 
    This is a native ES module (needed for the modular Firebase SDK via
    CDN, no bundler in this project), while index.html's main <script>
@@ -28,15 +25,15 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {
-  getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult,
-  signOut, onAuthStateChanged, deleteUser, reauthenticateWithRedirect
+  getAuth, GoogleAuthProvider, signInWithPopup,
+  signOut, onAuthStateChanged, deleteUser, reauthenticateWithPopup
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBDC1t74lUb1gEVJgLJQFFofq9drM9sumY",
-  // Usiamo il dominio Firebase ufficiale del progetto come authDomain.
-  // Con signInWithPopup non serve più il proxy /__/auth/* — Firebase
-  // gestisce tutto tramite il suo dominio nativo.
+  // Dominio Firebase nativo del progetto — funziona subito con signInWithPopup
+  // senza necessità di proxy. Il sito (moodmovie.pages.dev) deve essere
+  // nei "Domini autorizzati" in Firebase Console > Authentication > Settings.
   authDomain: "wavelane-36860.firebaseapp.com",
   projectId: "wavelane-36860",
   storageBucket: "wavelane-36860.firebasestorage.app",
@@ -56,14 +53,7 @@ function dispatch(name, detail) {
   window.dispatchEvent(new CustomEvent(name, { detail }));
 }
 
-getRedirectResult(auth).catch((e) => {
-  console.warn("MoodMovie cloud: redirect sign-in failed", e);
-  dispatch("moodcloud-signin-error", { code: e?.code || "unknown", message: e?.message || String(e) });
-});
-
-// Continuation of deleteAccount()'s reauth-then-delete redirect path
-// (see below): the redirect reloaded the page, so pick the delete
-// back up here once auth is settled again.
+// Continuation of deleteAccount()'s reauth-then-delete path.
 if (sessionStorage.getItem("moodcloud_pending_delete") === "1") {
   sessionStorage.removeItem("moodcloud_pending_delete");
   let deleteRetryUnsub = null;
@@ -86,10 +76,12 @@ onAuthStateChanged(auth, (user) => {
 window.MoodCloud = {
   async signIn() {
     try {
-      await signInWithRedirect(auth, provider); // page navigates away; result picked up by getRedirectResult() above on reload
+      const result = await signInWithPopup(auth, provider);
+      // result.user è disponibile subito — onAuthStateChanged aggiornerà la UI
       return { ok: true };
     } catch (e) {
       console.warn("MoodMovie cloud: sign-in failed", e);
+      dispatch("moodcloud-signin-error", { code: e?.code || "unknown", message: e?.message || String(e) });
       return { ok: false, code: e?.code || "unknown", message: e?.message || String(e) };
     }
   },
@@ -98,6 +90,7 @@ window.MoodCloud = {
   },
   async switchAccount() {
     try { await signOut(auth); } catch (e) { /* ignore */ }
+    provider.setCustomParameters({ prompt: "select_account" });
     return window.MoodCloud.signIn();
   },
   // Deletes only the Firebase Auth account (Google identity). The
@@ -112,14 +105,13 @@ window.MoodCloud = {
       return { ok: true };
     } catch (e) {
       if (e.code === "auth/requires-recent-login") {
-        sessionStorage.setItem("moodcloud_pending_delete", "1");
         try {
-          await reauthenticateWithRedirect(user, provider);
+          await reauthenticateWithPopup(user, provider);
+          await deleteUser(user);
+          return { ok: true };
         } catch (e2) {
-          sessionStorage.removeItem("moodcloud_pending_delete");
           return { ok: false, needsReauth: true, error: e2 };
         }
-        return { ok: false, pending: true };
       }
       return { ok: false, error: e };
     }

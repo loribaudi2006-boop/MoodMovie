@@ -34,10 +34,10 @@ import {
 
 const firebaseConfig = {
   apiKey: "AIzaSyBDC1t74lUb1gEVJgLJQFFofq9drM9sumY",
-  // MoodMovie's own domain, together with the /__/auth/* proxy in
-  // netlify.toml — keeps the whole OAuth handshake same-origin, which
-  // is what makes signInWithRedirect actually work on Safari/iOS.
-  authDomain: "moodmovie.pages.dev",
+  // Usiamo il dominio Firebase ufficiale del progetto come authDomain.
+  // Con signInWithPopup non serve più il proxy /__/auth/* — Firebase
+  // gestisce tutto tramite il suo dominio nativo.
+  authDomain: "wavelane-36860.firebaseapp.com",
   projectId: "wavelane-36860",
   storageBucket: "wavelane-36860.firebasestorage.app",
   messagingSenderId: "512056899201",

@@ -37,7 +37,7 @@ const firebaseConfig = {
   // MoodMovie's own domain, together with the /__/auth/* proxy in
   // netlify.toml — keeps the whole OAuth handshake same-origin, which
   // is what makes signInWithRedirect actually work on Safari/iOS.
-  authDomain: "subtle-trifle-d19a77.netlify.app",
+  authDomain: "moodmovie.pages.dev",
   projectId: "wavelane-36860",
   storageBucket: "wavelane-36860.firebasestorage.app",
   messagingSenderId: "512056899201",

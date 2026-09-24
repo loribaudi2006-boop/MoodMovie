@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MoodMovie - Diagnostica TV</title>
+<style>
+  body { background:#000; color:#0f0; font-family:monospace; font-size:22px; padding:30px; line-height:1.6; }
+  h1 { color:#fff; font-size:28px; }
+  .ok { color:#4cd964; }
+  .fail { color:#ff3b30; font-weight:bold; }
+  .box { background:#111; border:2px solid #333; padding:15px; margin:15px 0; word-break:break-all; }
+  .big { font-size:26px; }
+  #cssvartest { background: red; width:50px; height:50px; display:inline-block; vertical-align:middle; }
+  #cssgridtest { display:grid; grid-template-columns: 1fr 1fr; gap:4px; width:100px; }
+  #cssgridtest div { background:blue; height:20px; }
+</style>
+</head>
+<body>
+<h1>MoodMovie - Test compatibilita TV</h1>
+<div class="box">
+  <div>Se stai leggendo questo testo, HTML e CSS di base funzionano.</div>
+</div>
+<div class="box">
+  <div class="big">USER AGENT (importantissimo, scrivilo o fotografalo):</div>
+  <div id="ua" style="color:#fff;"></div>
+</div>
+<div class="box" id="results">Esecuzione test in corso...</div>
+<div class="box">
+  <div class="big">Test CSS:</div>
+  <div id="cssresults">In corso...</div>
+  <div style="margin-top:10px;">Quadratino qui sotto: se è VERDE le variabili CSS funzionano, se resta ROSSO no.
+  <div id="cssvartest"></div></div>
+</div>
+<div class="box">
+  <div class="big">Test rete (XMLHttpRequest, funziona anche senza fetch):</div>
+  <div id="xhrresult">In attesa...</div>
+</div>
+<div class="box">
+  <div class="big">Test rete (fetch, se disponibile):</div>
+  <div id="netresult">In attesa...</div>
+</div>
+<div class="box">
+  <div class="big">Test caricamento immagine da TMDB:</div>
+  <div id="imgresult">In attesa...</div>
+  <img id="testimg" style="width:80px;display:block;margin-top:8px;border:2px solid #666;">
+</div>
+
+<script>
+document.getElementById('ua').textContent = navigator.userAgent || '(non disponibile)';
+
+function testSyntax(label, code) {
+  try {
+    new Function(code);
+    return { label: label, ok: true };
+  } catch (e) {
+    return { label: label, ok: false, err: String(e) };
+  }
+}
+
+var tests = [
+  testSyntax('Arrow functions ( => )', 'var f = () => 1;'),
+  testSyntax('Template literals ( ` )', 'var x = `hi`;'),
+  testSyntax('const/let', 'let x = 1; const y = 2;'),
+  testSyntax('Destructuring', 'var o = {a:1}; var {a} = o;'),
+  testSyntax('Spread operator ( ... )', 'var a = [1,2]; var b = [...a];'),
+  testSyntax('Async/await', 'async function f(){ await 1; }'),
+  testSyntax('Optional chaining ( ?. )', 'var o = {}; var x = o?.y;'),
+  testSyntax('Nullish coalescing ( ?? )', 'var x = null ?? 1;'),
+  testSyntax('Classi ES6', 'class A {}'),
+  testSyntax('Array.includes', '[1,2].includes(1);'),
+  testSyntax('Object.assign', 'Object.assign({}, {});')
+];
+
+var apiTests = [
+  { label: 'fetch API', ok: typeof fetch === 'function' },
+  { label: 'Promise', ok: typeof Promise === 'function' },
+  { label: 'XMLHttpRequest', ok: typeof XMLHttpRequest === 'function' },
+  { label: 'localStorage', ok: (function(){ try { localStorage.setItem('t','1'); localStorage.removeItem('t'); return true; } catch(e){ return false; } })() },
+  { label: 'MutationObserver', ok: typeof MutationObserver === 'function' },
+  { label: 'matchMedia', ok: typeof matchMedia === 'function' },
+  { label: 'classList', ok: !!(document.body && document.body.classList) },
+  { label: 'video autoplay element', ok: typeof HTMLMediaElement !== 'undefined' }
+];
+
+var html = '<div class="big">Sintassi JavaScript:</div>';
+tests.forEach(function (t) {
+  html += '<div class="' + (t.ok ? 'ok' : 'fail') + '">' + (t.ok ? 'OK  ' : 'NON SUPPORTATO  ') + t.label + '</div>';
+});
+html += '<div class="big" style="margin-top:15px;">API del browser:</div>';
+apiTests.forEach(function (t) {
+  html += '<div class="' + (t.ok ? 'ok' : 'fail') + '">' + (t.ok ? 'OK  ' : 'NON SUPPORTATO  ') + t.label + '</div>';
+});
+document.getElementById('results').innerHTML = html;
+
+// Test CSS: variabili (custom properties) e Grid
+var cssHtml = '';
+var cssVarOk = false;
+try {
+  cssVarOk = !!(window.CSS && CSS.supports && CSS.supports('color', 'var(--x)'));
+} catch (e) {}
+cssHtml += '<div class="' + (cssVarOk ? 'ok' : 'fail') + '">' + (cssVarOk ? 'OK  ' : 'NON SUPPORTATO  ') + 'Variabili CSS (--nome)</div>';
+var cssGridOk = false;
+try {
+  cssGridOk = !!(window.CSS && CSS.supports && CSS.supports('display', 'grid'));
+} catch (e) {}
+cssHtml += '<div class="' + (cssGridOk ? 'ok' : 'fail') + '">' + (cssGridOk ? 'OK  ' : 'NON SUPPORTATO  ') + 'CSS Grid</div>';
+document.getElementById('cssresults').innerHTML = cssHtml;
+// Test visivo diretto: se il browser applica davvero var(), il quadratino diventa verde
+try { document.getElementById('cssvartest').style.setProperty('--tvtestcolor', '#4cd964'); document.getElementById('cssvartest').style.background = 'var(--tvtestcolor, red)'; } catch (e) {}
+
+// Test rete con XMLHttpRequest (disponibile anche su browser molto vecchi)
+var xhrDiv = document.getElementById('xhrresult');
+try {
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', 'https://api.themoviedb.org/3/movie/550?api_key=b960ea3a0f017ede523e34c7f5303835&language=it-IT', true);
+  xhr.timeout = 10000;
+  xhr.onreadystatechange = function () {
+    if (xhr.readyState === 4) {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          var data = JSON.parse(xhr.responseText);
+          xhrDiv.innerHTML = '<span class="ok">OK  Rete funzionante (XHR). Titolo ricevuto: ' + (data.title || '(vuoto)') + '</span>';
+        } catch (e) {
+          xhrDiv.innerHTML = '<span class="fail">FALLITO  Risposta ricevuta ma non leggibile: ' + String(e) + '</span>';
+        }
+      } else {
+        xhrDiv.innerHTML = '<span class="fail">FALLITO  Stato HTTP: ' + xhr.status + '</span>';
+      }
+    }
+  };
+  xhr.onerror = function () {
+    xhrDiv.innerHTML = '<span class="fail">FALLITO  Errore di rete/connessione (XHR onerror) - possibile blocco TLS/HTTPS o rete</span>';
+  };
+  xhr.ontimeout = function () {
+    xhrDiv.innerHTML = '<span class="fail">FALLITO  Timeout: nessuna risposta entro 10s</span>';
+  };
+  xhr.send();
+} catch (e) {
+  xhrDiv.innerHTML = '<span class="fail">FALLITO  Eccezione: ' + String(e) + '</span>';
+}
+
+// Test rete con fetch (se disponibile)
+var netDiv = document.getElementById('netresult');
+if (typeof fetch === 'function') {
+  fetch('https://api.themoviedb.org/3/movie/550?api_key=b960ea3a0f017ede523e34c7f5303835&language=it-IT')
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      netDiv.innerHTML = '<span class="ok">OK  Rete/API funzionanti (fetch). Titolo test ricevuto: ' + (d.title || '(vuoto)') + '</span>';
+    })
+    .catch(function (e) {
+      netDiv.innerHTML = '<span class="fail">FALLITO  Chiamata fetch bloccata o fallita: ' + String(e) + '</span>';
+    });
+} else {
+  netDiv.innerHTML = '<span class="fail">fetch non disponibile nativamente (normale su TV datate, guarda il test XHR sopra).</span>';
+}
+
+// Test caricamento immagine reale (poster) dal CDN di TMDB
+var imgDiv = document.getElementById('imgresult');
+var testImg = document.getElementById('testimg');
+testImg.onload = function () { imgDiv.innerHTML = '<span class="ok">OK  Immagine caricata correttamente.</span>'; };
+testImg.onerror = function () { imgDiv.innerHTML = '<span class="fail">FALLITO  Immagine non caricata.</span>'; };
+testImg.src = 'https://image.tmdb.org/t/p/w185/rktDFPbfHfUbArZ6OOOKsXcv0Bm.jpg';
+</script>
+</body>
+</html>

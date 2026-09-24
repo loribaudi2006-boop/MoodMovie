@@ -1,0 +1,16 @@
+{
+  "name": "MoodMovie",
+  "short_name": "MoodMovie",
+  "description": "Trova e guarda film e serie TV in base al mood, con sincronizzazione multi-dispositivo.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "id": "./index.html",
+  "display": "standalone",
+  "background_color": "#07070b",
+  "theme_color": "#07070b",
+  "orientation": "portrait",
+  "lang": "it",
+  "icons": [
+    { "src": "icon.png", "sizes": "493x493", "type": "image/png", "purpose": "any" }
+  ]
+}

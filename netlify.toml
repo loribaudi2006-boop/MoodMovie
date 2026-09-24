@@ -1,0 +1,16 @@
+# Proxies Firebase Auth's sign-in helper pages through this app's own
+# domain instead of the OAuth flow hopping over to wavelane-36860.firebaseapp.com.
+# Safari (16.1+) and other browsers block the storage access that flow
+# relies on across domains, which breaks signInWithRedirect otherwise —
+# proxying keeps it same-origin, per Firebase/Google's own documented fix
+# ("Option 3: Proxy auth requests to firebaseapp.com").
+[[redirects]]
+  from = "/__/auth/*"
+  to = "https://wavelane-36860.firebaseapp.com/__/auth/:splat"
+  status = 200
+  force = true
+
+[[headers]]
+  for = "/cloud.js"
+  [headers.values]
+    Cache-Control = "no-cache, must-revalidate"

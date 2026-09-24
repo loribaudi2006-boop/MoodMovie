@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MoodMovie TV</title>
+    <meta name="theme-color" content="#0a0a0a">
+    <link rel="icon" type="image/png" href="icon.png">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; outline: none; }
+        html { font-size: 19px; }
+        body { font-family: Arial, Helvetica, sans-serif; background: #0a0a0a; color: #ffffff; margin: 0; padding-bottom: 110px; overflow-x: hidden; }
+
+        header { padding: 30px 56px 40px; background: rgba(10, 10, 10, 0.9); position: fixed; top: 0; left: 0; right: 0; z-index: 1000; }
+        .logo { color: #e50914; font-size: 1.6rem; font-weight: 800; text-align: center; margin-bottom: 25px; letter-spacing: -0.5px; }
+
+        .search-wrapper { max-width: 640px; margin: 0 auto; display: -webkit-box; display: -webkit-flex; display: flex; align-items: center; gap: 10px; position: relative; }
+        .menu-trigger { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); color: white; width: 48px; height: 48px; min-width: 48px; border-radius: 12px; display: -webkit-box; display: -webkit-flex; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; }
+        .search-menu { position: fixed; background: #1a1a1a; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; width: 260px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); display: none; z-index: 9999; overflow: hidden; }
+        .search-menu.active { display: block; }
+        .menu-item { padding: 14px 18px; font-size: 0.85rem; font-weight: 600; color: #a0a0a0; cursor: pointer; display: -webkit-box; display: -webkit-flex; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .menu-item i { color: #e50914; width: 20px; text-align: center; }
+        .menu-item:last-child { border-bottom: none; }
+        .menu-item.selected { background: rgba(229, 9, 20, 0.1); color: white; }
+
+        .search-container { -webkit-flex: 1; flex: 1; position: relative; }
+        input[type="text"] { width: 100%; padding: 16px 20px 16px 55px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.08); color: #fff; font-size: 1rem; }
+        input[type="text"]:focus { background: rgba(255,255,255,0.15); border-color: #e50914; }
+        .search-container i { position: absolute; left: 18px; top: 50%; margin-top: -0.55em; color: #e50914; font-size: 1.1rem; }
+
+        .sort-bar-row { display: -webkit-box; display: -webkit-flex; display: flex; align-items: center; gap: 8px; margin: 15px 0 20px; }
+        .sort-bar { display: -webkit-box; display: -webkit-flex; display: flex; gap: 8px; overflow-x: auto; position: relative; z-index: 10; -webkit-flex: 1; flex: 1; margin: 0; }
+        .sort-chip { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #a0a0a0; padding: 10px 18px; border-radius: 20px; font-size: 0.78rem; white-space: nowrap; cursor: pointer; font-weight: 600; }
+        .sort-chip.active { background: #e50914; color: white; border-color: #e50914; }
+
+        .page-wrap { padding-top: 190px; }
+        .container { max-width: 1600px; margin: 0 auto; padding: 0 56px; min-height: 70vh; position: relative; z-index: 1; }
+        #sectionTitle { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1.5px; color: #a0a0a0; margin: 20px 0 14px 4px; font-weight: 600; }
+
+        .movie-grid { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-flex-wrap: wrap; flex-wrap: wrap; gap: 18px; position: relative; z-index: 1; }
+        .movie-grid > .movie-card { -webkit-flex: 0 1 150px; flex: 0 1 150px; margin: 0 9px 18px 0; }
+        .movie-card { background: #1a1a1a; border-radius: 12px; overflow: hidden; position: relative; }
+        .movie-card img { width: 100%; height: 225px; object-fit: cover; display: block; }
+
+        .load-more-btn { display: none; width: 100%; max-width: 340px; margin: 30px auto; padding: 18px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; font-weight: 700; cursor: pointer; font-size: 0.95rem; }
+
+        .modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: #000; z-index: 2000; overflow-y: auto; }
+        .modal.open { display: block; }
+        .modal-hero { width: 100%; height: 46vh; background-size: cover; background-position: center; position: relative; }
+        .modal-hero-fade { position: absolute; left: 0; bottom: 0; width: 100%; height: 100%; background: -webkit-linear-gradient(bottom, #0a0a0a 10%, transparent 100%); background: linear-gradient(to top, #0a0a0a 10%, transparent 100%); }
+        .modal-body { padding: 0 60px 70px; position: relative; margin-top: -80px; z-index: 2; max-width: 1100px; }
+        .modal-header-info { display: -webkit-box; display: -webkit-flex; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; width: 100%; }
+        .modal-genres { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-flex-wrap: wrap; flex-wrap: wrap; gap: 6px; -webkit-flex: 1; flex: 1; }
+        .modal-genres span { background: rgba(255,255,255,0.12); padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; color: #eee; }
+        .modal-meta { display: -webkit-box; display: -webkit-flex; display: flex; align-items: center; gap: 10px; }
+        #modalYear { background: rgba(255,255,255,0.1); padding: 6px 12px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; color: #ffffff; }
+        #modalRating { background: rgba(255,255,255,0.1); padding: 6px 12px; border-radius: 8px; font-weight: 800; font-size: 1.05rem; color: #ffc107; white-space: nowrap; }
+
+        .close { position: fixed; top: 24px; right: 24px; font-size: 1.3rem; color: #fff; z-index: 2100; background: rgba(0,0,0,0.6); width: 50px; height: 50px; display: -webkit-box; display: -webkit-flex; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+
+        .video-container { width: 100%; height: 0; padding-top: 56.25%; background: #000; display: none; margin: 20px 0; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); position: relative; }
+        .video-container iframe { width: 100%; height: 100%; border: none; position: absolute; top: 0; left: 0; }
+
+        .sandbox-control { display: none; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 14px 18px; border-radius: 12px; margin-bottom: 10px; border: 1px solid rgba(255,255,255,0.1); }
+        .sandbox-text { font-size: 0.85rem; font-weight: 600; color: #a0a0a0; }
+        .sandbox-status { color: #4cd964; font-weight: 800; }
+        .sandbox-status.off { color: #e50914; }
+        .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; }
+        input:checked + .slider { background-color: #4cd964; }
+        input:checked + .slider:before { -webkit-transform: translateX(24px); transform: translateX(24px); }
+
+        .btn-watch { background: #e50914; color: #fff; padding: 18px; border-radius: 14px; font-weight: 800; display: block; text-align: center; margin-top: 25px; border: none; width: 100%; cursor: pointer; font-size: 1.05rem; }
+        .watch-btn-row { display: -webkit-box; display: -webkit-flex; display: flex; gap: 10px; margin-top: 25px; align-items: stretch; }
+        .watch-btn-row .btn-watch { margin-top: 0; width: auto; -webkit-flex: 2.3; flex: 2.3; min-width: 0; }
+        .btn-restart { display: none; align-items: center; justify-content: center; gap: 8px; background: rgba(255,255,255,0.1); color: #fff; padding: 18px 14px; border-radius: 14px; font-weight: 800; border: 1px solid rgba(255,255,255,0.2); cursor: pointer; font-size: 0.8rem; white-space: nowrap; -webkit-flex: 1.3; flex: 1.3; min-width: 0; }
+        .btn-original { background: #333; color: #fff; padding: 16px; border-radius: 14px; font-weight: 700; display: block; text-align: center; margin-top: 10px; border: 1px solid rgba(255,255,255,0.1); width: 100%; cursor: pointer; font-size: 0.95rem; }
+        .btn-trailer { background: rgba(255,255,255,0.1); color: #fff; padding: 16px; border-radius: 14px; font-weight: 700; display: block; text-align: center; margin-top: 12px; border: 1px solid rgba(255,255,255,0.2); width: 100%; cursor: pointer; }
+        .btn-similar { background: rgba(255,255,255,0.05); color: #ccc; padding: 16px; border-radius: 14px; font-weight: 600; display: block; text-align: center; margin-top: 12px; border: 1px solid rgba(255,255,255,0.1); width: 100%; cursor: pointer; font-size: 0.9rem; }
+
+        .platform-grid { display: -webkit-box; display: -webkit-flex; display: flex; -webkit-flex-wrap: wrap; flex-wrap: wrap; gap: 14px; margin-top: 15px; }
+        .platform-logo { width: 56px; height: 56px; border-radius: 10px; }
+
+        .ep-selector { display: none; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 18px; margin-top: 20px; }
+        .ep-selector-title { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #a0a0a0; margin-bottom: 14px; }
+        .ep-row { display: -webkit-box; display: -webkit-flex; display: flex; gap: 14px; }
+        .ep-col { -webkit-flex: 1; flex: 1; display: -webkit-box; display: -webkit-flex; display: flex; flex-direction: column; gap: 6px; position: relative; min-width: 0; }
+        .ep-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #a0a0a0; padding-left: 2px; }
+        .ep-select { width: 100%; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: #fff; padding: 12px 14px; border-radius: 10px; font-size: 0.9rem; font-weight: 600; cursor: pointer; display: -webkit-box; display: -webkit-flex; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; overflow: hidden; }
+        .ep-select span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; -webkit-flex: 1; flex: 1; }
+        .ep-select.active { border-color: #e50914; background: rgba(255,255,255,0.12); }
+        .ep-dropdown { position: absolute; top: 100%; margin-top: 8px; left: 0; right: 0; width: 100%; }
+        .ep-dropdown .menu-item { white-space: normal; }
+
+        .home-sections { display: -webkit-box; display: -webkit-flex; display: flex; flex-direction: column; padding-top: 4px; }
+        .home-section { margin-bottom: 32px; }
+        .home-section-header { display: -webkit-box; display: -webkit-flex; display: flex; align-items: center; justify-content: space-between; padding: 0 4px; margin-bottom: 14px; }
+        .home-section-title { font-size: 0.95rem; font-weight: 900; letter-spacing: 1.2px; text-transform: uppercase; color: #e50914; }
+        .home-section-title span { color: #fff; font-style: italic; }
+        .home-row { display: -webkit-box; display: -webkit-flex; display: flex; gap: 14px; overflow-x: auto; padding: 4px 0 12px; }
+        .home-card { -webkit-flex: 0 0 165px; flex: 0 0 165px; border-radius: 12px; overflow: hidden; background: #1a1a1a; position: relative; cursor: pointer; }
+        .home-card img { width: 165px; height: 248px; object-fit: cover; display: block; }
+        .home-card-progress { position: absolute; bottom: 0; left: 0; right: 0; height: 4px; background: rgba(255,255,255,0.15); }
+        .home-card-progress-bar { height: 100%; background: #e50914; border-radius: 2px; }
+        .home-card-del { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.7); border: none; color: #fff; width: 32px; height: 32px; border-radius: 50%; font-size: 0.8rem; display: -webkit-box; display: -webkit-flex; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 5; }
+        .home-empty { color: #555; font-size: 0.9rem; padding: 20px 4px; font-style: italic; }
+        .home-card-loadmore { -webkit-flex: 0 0 165px; flex: 0 0 165px; height: 248px; border-radius: 12px; background: rgba(255,255,255,0.04); border: 1.5px dashed rgba(229,9,20,0.35); display: -webkit-box; display: -webkit-flex; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; cursor: pointer; color: #e50914; }
+        .home-card-loadmore span { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; text-align: center; padding: 0 8px; color: #a0a0a0; }
+
+        .nav { position: fixed; bottom: 0; left: 0; right: 0; width: 100%; height: 90px; background: rgba(10, 10, 10, 0.95); display: -webkit-box; display: -webkit-flex; display: flex; z-index: 1500; border-top: 1px solid rgba(255,255,255,0.08); align-items: center; padding: 0 40px; }
+        .nav-link { -webkit-flex: 1; flex: 1; text-align: center; color: #777; font-size: 0.78rem; font-weight: 600; display: -webkit-box; display: -webkit-flex; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; }
+        .nav-link.active { color: #e50914; }
+        .nav-link i { display: block; font-size: 1.4rem; margin-bottom: 5px; }
+        .nav-link-main i { font-size: 1.7rem; }
+
+        .app-offline-indicator { position: fixed; bottom: 105px; left: 50%; margin-left: -140px; width: 280px; background: rgba(26,26,26,0.95); border: 1px solid rgba(229,9,20,0.6); color: #fff; padding: 12px 20px; border-radius: 30px; font-size: 0.85rem; font-weight: 700; display: none; align-items: center; justify-content: center; gap: 10px; z-index: 1800; }
+        .app-offline-indicator.show { display: flex; }
+        .app-offline-indicator i { color: #e50914; }
+
+        /* ── Anello di focus per la navigazione a telecomando (sempre visibile: qui non c'e' mouse) ── */
+        .tv-focused {
+            outline: 4px solid #fff;
+            box-shadow: 0 0 0 6px rgba(229,9,20,0.9);
+            border-radius: 8px;
+        }
+        .movie-card.tv-focused, .home-card.tv-focused, .home-card-loadmore.tv-focused {
+            -webkit-transform: scale(1.1);
+            transform: scale(1.1);
+            position: relative;
+            z-index: 50;
+        }
+    </style>
+</head>
+<body>
+
+<div id="appOfflineIndicator" class="app-offline-indicator"><i class="fa-solid fa-wifi"></i><span>Sei offline</span></div>
+
+<div id="searchMenu" class="search-menu">
+    <div class="menu-item selected"><i class="fa-solid fa-wand-magic-sparkles"></i> Titolo o Vibes</div>
+    <div class="menu-item"><i class="fa-solid fa-user-ninja"></i> In base all'attore</div>
+    <div class="menu-item"><i class="fa-solid fa-list-ul"></i> Categoria <i class="fa-solid fa-chevron-right" style="margin-left:auto;font-size:0.7rem;"></i></div>
+</div>
+<div id="categoryMenu" class="search-menu" style="max-height: 420px; overflow-y: auto;"></div>
+
+<header>
+    <div class="logo">MoodMovie</div>
+    <div class="search-wrapper">
+        <div id="menuTrigger" class="menu-trigger"><i class="fa-solid fa-bars"></i></div>
+        <div class="search-container">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="searchInput" placeholder="Es: super eroe, catastrofi, brividi...">
+        </div>
+    </div>
+    <div class="sort-bar-row" id="sortBarRow" style="display:none;">
+        <div class="sort-bar" id="sortBar">
+            <div class="sort-chip active" data-sort="popularity">Tendenze</div>
+            <div class="sort-chip" data-sort="date">Recenti</div>
+            <div class="sort-chip" data-sort="rating">Voto</div>
+        </div>
+    </div>
+</header>
+
+<div class="page-wrap">
+    <div class="container">
+        <h2 id="sectionTitle" style="display:none;">Film Popolari</h2>
+        <div id="movieGrid"></div>
+        <div id="loading" style="text-align: center; padding: 40px; display: none;"><i class="fa-solid fa-circle-notch fa-spin fa-2x" style="color:#e50914"></i></div>
+        <button id="loadMoreBtn" class="load-more-btn">CARICA ALTRI</button>
+    </div>
+</div>
+
+<div id="movieModal" class="modal">
+    <span class="close" id="modalCloseBtn"><i class="fa-solid fa-xmark"></i></span>
+    <div class="modal-hero" id="modalHero"><div class="modal-hero-fade"></div></div>
+    <div class="modal-body">
+        <div class="modal-header-info">
+            <div id="modalGenres" class="modal-genres"></div>
+            <div class="modal-meta">
+                <div id="modalYear"></div>
+                <div id="modalRating"></div>
+            </div>
+        </div>
+        <h1 id="modalTitle" style="font-size: 2rem; font-weight: 900; margin: 0 0 15px; line-height: 1.15;"></h1>
+        <p id="modalPlot" style="font-size: 1rem; line-height: 1.6; color: #a0a0a0; max-width: 900px;"></p>
+
+        <div id="sandboxControl" class="sandbox-control">
+            <div class="sandbox-text">Protezione Pop-up: <span id="statusLabel" class="sandbox-status">ATTIVA</span></div>
+            <label class="switch">
+                <input type="checkbox" id="sandboxToggle" checked>
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div id="videoPlayer" class="video-container"></div>
+
+        <div id="epSelector" class="ep-selector">
+            <div class="ep-selector-title"><i class="fa-solid fa-list" style="margin-right:6px;color:#e50914"></i>Seleziona Episodio</div>
+            <div class="ep-row">
+                <div class="ep-col">
+                    <span class="ep-label">Stagione</span>
+                    <div id="seasonSelectBtn" class="ep-select">
+                        <span id="seasonSelectLabel">Stagione 1</span>
+                        <i class="fa-solid fa-chevron-down" style="font-size:0.7rem;color:#a0a0a0;"></i>
+                    </div>
+                    <div id="seasonMenu" class="search-menu ep-dropdown" style="max-height: 320px; overflow-y: auto;"></div>
+                </div>
+                <div class="ep-col">
+                    <span class="ep-label">Episodio</span>
+                    <div id="episodeSelectBtn" class="ep-select">
+                        <span id="episodeSelectLabel">Episodio 1</span>
+                        <i class="fa-solid fa-chevron-down" style="font-size:0.7rem;color:#a0a0a0;"></i>
+                    </div>
+                    <div id="episodeMenu" class="search-menu ep-dropdown" style="max-height: 320px; overflow-y: auto;"></div>
+                </div>
+            </div>
+        </div>
+        <div class="watch-btn-row">
+            <button id="watchNowBtn" class="btn-watch" style="margin-top:0;"><i class="fa-solid fa-play" style="margin-right: 8px;"></i> GUARDA ORA (Italiano)</button>
+            <button id="restartBtn" class="btn-restart"><i class="fa-solid fa-rotate-left"></i> RICOMINCIA</button>
+        </div>
+        <button id="watchOriginalBtn" class="btn-original"><i class="fa-solid fa-globe" style="margin-right: 8px;"></i> LINGUA ORIGINALE (Rapido)</button>
+        <button id="trailerTrigger" class="btn-trailer">VEDI TRAILER</button>
+
+        <div id="modalProviders" style="margin-top: 40px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 25px;">
+            <span style="font-size: 0.75rem; color: #a0a0a0; font-weight: 800; text-transform: uppercase;">In Streaming</span>
+            <div id="platformList" class="platform-grid"></div>
+        </div>
+        <button id="similarTrigger" class="btn-similar"><i class="fa-solid fa-wand-magic-sparkles" style="margin-right: 8px;"></i> TROVA SIMILI & VIBES</button>
+    </div>
+</div>
+
+<nav class="nav">
+    <div class="nav-link" id="tvBtn"><i class="fa-solid fa-tv"></i>Serie TV</div>
+    <div class="nav-link nav-link-main active" id="homeBtn"><i class="fa-solid fa-film"></i>Film</div>
+</nav>
+
+<script src="tv-app.js"></script>
+</body>
+</html>

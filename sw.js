@@ -1,7 +1,7 @@
 // Service worker di MoodMovie: tiene una copia della shell dell'app per
 // aprirla subito, anche con rete assente o che non risponde. TMDB, poster
 // e player restano sempre in rete.
-const CACHE_NAME = 'moodmovie-shell-v44';
+const CACHE_NAME = 'moodmovie-shell-v45';
 const API_CACHE = 'moodmovie-api-v1';
 const API_MAX_AGE = 24 * 3600 * 1000;
 const API_MAX_ITEMS = 260;

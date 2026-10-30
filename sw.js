@@ -1,67 +1,118 @@
-// Service worker di MoodMovie: mette in cache solo la shell statica dell'app
-// (HTML, manifest, icone, splash) cosi l'app si installa ed e resiliente offline.
-// Le chiamate a TMDB, alle immagini dei poster e ai player (vixsrc/vidsrc) restano
-// sempre in rete: sono dati dinamici o cross-origin, non ha senso metterli in cache.
-const CACHE_NAME = 'moodmovie-shell-v16';
+// Service worker di MoodMovie: tiene una copia della shell dell'app per
+// aprirla subito, anche con rete assente o che non risponde. TMDB, poster
+// e player restano sempre in rete.
+const CACHE_NAME = 'moodmovie-shell-v44';
+const API_CACHE = 'moodmovie-api-v1';
+const API_MAX_AGE = 24 * 3600 * 1000;
+const API_MAX_ITEMS = 260;
+const FONT_CACHE = 'moodmovie-fonts-v1';
 const SHELL_ASSETS = [
-    './',
-    './index.html',
-    './cloud.js',
-    './manifest.json',
-    './icon.png',
-    './splash.mp4',
-    './splash_poster.jpg'
+    './', './index.html', './cloud.js', './realtime.js', './manifest.json', './icon.png',
+    './icons/icon-192.png', './icons/logo-96.png', './icons/logo-sign.png', './icons/icon-512.png', './icons/apple-touch-icon.png'
 ];
+const NET_TIMEOUT_MS = 3000;
+const DEAD_NET_MS = 15000;
+let netDeadUntil = 0;
 
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME)
-            .then((cache) => cache.addAll(SHELL_ASSETS))
-            .then(() => self.skipWaiting())
+            .then((cache) => Promise.all(SHELL_ASSETS.map((f) => cache.add(f).catch(() => {}))))
+            .catch(() => {})
     );
+    self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-    event.waitUntil(
-        caches.keys()
-            .then((names) => Promise.all(names.filter((n) => n !== CACHE_NAME).map((n) => caches.delete(n))))
-            .then(() => self.clients.claim())
-    );
+    event.waitUntil((async () => {
+        try {
+            const cache = await caches.open(CACHE_NAME);
+            for (const f of SHELL_ASSETS) {
+                if (await cache.match(f)) continue;
+                const old = await caches.match(f);
+                if (old) await cache.put(f, old);
+            }
+        } catch (e) { /* best effort */ }
+        const names = await caches.keys();
+        await Promise.all(names.filter((n) => n !== CACHE_NAME && n !== FONT_CACHE && n !== API_CACHE).map((n) => caches.delete(n)));
+        await self.clients.claim();
+    })());
 });
+
+function savedCopy(req) {
+    return caches.match(req, { ignoreSearch: true }).then((cached) => {
+        if (cached) return cached;
+        if (req.mode === 'navigate') return caches.match('./index.html');
+        return undefined;
+    });
+}
 
 self.addEventListener('fetch', (event) => {
     const req = event.request;
     if (req.method !== 'GET') return;
-
     const url = new URL(req.url);
-    if (url.origin !== self.location.origin) return; // lascia passare tutto ciò che non è la shell dell'app
-
-    // Apertura/ricarica dell'app: prova la rete (per avere sempre l'ultima versione),
-    // cade sulla shell in cache solo se offline.
-    if (req.mode === 'navigate') {
-        event.respondWith(
-            fetch(req)
-                .then((res) => {
-                    const copy = res.clone();
-                    caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
-                    return res;
-                })
-                .catch(() => caches.match('./index.html'))
-        );
-        return;
-    }
-
-    // Altri asset della shell: cache prima (avvio istantaneo), rete come fallback/aggiornamento in background
-    event.respondWith(
-        caches.match(req).then((cached) => {
-            if (cached) return cached;
-            return fetch(req).then((res) => {
-                const copy = res.clone();
-                caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+    if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com' || (url.hostname === 'cdnjs.cloudflare.com' && url.pathname.includes('/font-awesome/'))) {
+        event.respondWith((async () => {
+            const cache = await caches.open(FONT_CACHE);
+            const cached = await cache.match(req);
+            const network = fetch(req).then((res) => {
+                if (res && (res.ok || res.type === 'opaque')) cache.put(req, res.clone());
                 return res;
             });
-        })
-    );
+            if (cached) { event.waitUntil(network.catch(() => {})); return cached; }
+            return network;
+        })());
+        return;
+    }
+    // TMDB: la risposta salvata arriva subito (avvio istantaneo), quella nuova
+    // si scarica in background e sara' pronta la volta dopo
+    if (url.hostname === 'api.themoviedb.org') {
+        event.respondWith((async () => {
+            const cache = await caches.open(API_CACHE);
+            const hit = await cache.match(req);
+            const fresh = hit && (Date.now() - Number(hit.headers.get('x-mm-time') || 0)) < API_MAX_AGE;
+            const net = fetch(req).then(async (res) => {
+                if (res && res.ok) {
+                    const body = await res.clone().blob();
+                    const headers = new Headers(res.headers);
+                    headers.set('x-mm-time', String(Date.now()));
+                    await cache.put(req, new Response(body, { status: res.status, statusText: res.statusText, headers }));
+                    const keys = await cache.keys();
+                    if (keys.length > API_MAX_ITEMS) await Promise.all(keys.slice(0, keys.length - API_MAX_ITEMS).map((k) => cache.delete(k)));
+                }
+                return res;
+            });
+            if (fresh) { event.waitUntil(net.catch(() => {})); return hit; }
+            try { return await net; } catch (e) { if (hit) return hit; throw e; }
+        })());
+        return;
+    }
+    if (url.origin !== self.location.origin) return;
+    if (url.pathname.endsWith('.mp4')) return;
+    event.respondWith((async () => {
+        const network = fetch(req).then((res) => {
+            netDeadUntil = 0;
+            if (res && res.status === 200) {
+                const copy = res.clone();
+                caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+            }
+            return res;
+        });
+        event.waitUntil(network.catch(() => {}));
+        if ((self.navigator && self.navigator.onLine === false) || Date.now() < netDeadUntil) {
+            const cached = await savedCopy(req);
+            if (cached) return cached;
+        }
+        let timer;
+        const timedOut = new Promise((resolve) => { timer = setTimeout(() => resolve('timeout'), NET_TIMEOUT_MS); });
+        const first = await Promise.race([network.catch(() => 'failed'), timedOut]);
+        clearTimeout(timer);
+        if (first !== 'timeout' && first !== 'failed') return first;
+        netDeadUntil = Date.now() + DEAD_NET_MS;
+        const cached = await savedCopy(req);
+        if (cached) return cached;
+        return network.catch(() => Response.error());
+    })());
 });
 
 // ── NOTIFICHE PUSH "titolo disponibile" ──

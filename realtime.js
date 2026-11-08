@@ -12,7 +12,7 @@
    sentono e controllano. Nel messaggio non viaggia nessun dato.
    ============================================================ */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.4';
 
 let _client = null;
 let _channel = null;

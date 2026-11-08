@@ -1,7 +1,11 @@
 // Service worker di MoodMovie: tiene una copia della shell dell'app per
-// aprirla subito, anche con rete assente o che non risponde. TMDB, poster
-// e player restano sempre in rete.
-const CACHE_NAME = 'moodmovie-shell-v45';
+// aprirla subito, anche con rete assente o che non risponde. Il player resta
+// sempre in rete. v30: le copertine TMDB (fino a w780) si tengono in una cache
+// a tetto fisso: niente riscaricamenti (meno dati mobili) e libreria visibile offline.
+const CACHE_NAME = 'moodmovie-shell-v46';
+const IMG_CACHE = 'moodmovie-img-v1';
+const IMG_MAX_ITEMS = 250;      // ~15-25 MB al massimo, poi si buttano le piu' vecchie
+let imgPuts = 0, apiPuts = 0;
 const API_CACHE = 'moodmovie-api-v1';
 const API_MAX_AGE = 24 * 3600 * 1000;
 const API_MAX_ITEMS = 260;
@@ -34,7 +38,7 @@ self.addEventListener('activate', (event) => {
             }
         } catch (e) { /* best effort */ }
         const names = await caches.keys();
-        await Promise.all(names.filter((n) => n !== CACHE_NAME && n !== FONT_CACHE && n !== API_CACHE).map((n) => caches.delete(n)));
+        await Promise.all(names.filter((n) => n !== CACHE_NAME && n !== FONT_CACHE && n !== API_CACHE && n !== IMG_CACHE).map((n) => caches.delete(n)));
         await self.clients.claim();
     })());
 });
@@ -77,13 +81,31 @@ self.addEventListener('fetch', (event) => {
                     const headers = new Headers(res.headers);
                     headers.set('x-mm-time', String(Date.now()));
                     await cache.put(req, new Response(body, { status: res.status, statusText: res.statusText, headers }));
-                    const keys = await cache.keys();
+                    const keys = (++apiPuts % 10) ? [] : await cache.keys();
                     if (keys.length > API_MAX_ITEMS) await Promise.all(keys.slice(0, keys.length - API_MAX_ITEMS).map((k) => cache.delete(k)));
                 }
                 return res;
             });
             if (fresh) { event.waitUntil(net.catch(() => {})); return hit; }
             try { return await net; } catch (e) { if (hit) return hit; throw e; }
+        })());
+        return;
+    }
+    // copertine: prima la copia salvata (le immagini TMDB non cambiano mai)
+    if (url.hostname === 'image.tmdb.org') {
+        const m = url.pathname.match(/^\/t\/p\/w(\d+)\//);
+        if (!m || Number(m[1]) > 780) return; // immagini enormi: solo rete, mai salvate
+        event.respondWith((async () => {
+            const cache = await caches.open(IMG_CACHE);
+            const hit = await cache.match(url.href);
+            if (hit) return hit;
+            try {
+                const res = await fetch(url.href, { mode: 'cors', credentials: 'omit' });
+                if (res && res.ok && (res.type === 'cors' || res.type === 'basic')) event.waitUntil(cache.put(url.href, res.clone()).then(trimImages).catch(() => {}));
+                return res;
+            } catch (e) {
+                return fetch(req);
+            }
         })());
         return;
     }
@@ -114,6 +136,13 @@ self.addEventListener('fetch', (event) => {
         return network.catch(() => Response.error());
     })());
 });
+
+async function trimImages() {
+    if (++imgPuts % 20) return;
+    const cache = await caches.open(IMG_CACHE);
+    const keys = await cache.keys();
+    if (keys.length > IMG_MAX_ITEMS) await Promise.all(keys.slice(0, keys.length - IMG_MAX_ITEMS).map((k) => cache.delete(k)));
+}
 
 // ── NOTIFICHE PUSH "titolo disponibile" ──
 // Arriva dalla Edge Function Supabase "check-upcoming" quando un titolo seguito si sblocca

@@ -2,6 +2,9 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
+    <!-- v30: l'app puo' caricare codice e dati solo dai servizi che usa davvero -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://esm.sh https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https://image.tmdb.org https://*.googleusercontent.com https://www.gstatic.com; media-src 'self' blob: data:; connect-src 'self' https://api.themoviedb.org https://image.tmdb.org https://bygrngfnmtofnilybxfk.supabase.co wss://bygrngfnmtofnilybxfk.supabase.co https://esm.sh https://*.googleapis.com https://www.gstatic.com https://apis.google.com https://fonts.googleapis.com https://fonts.gstatic.com https://cdnjs.cloudflare.com; frame-src https:; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>MoodMovie</title>
     
@@ -1324,6 +1327,32 @@
             .hero-frame { aspect-ratio: 25 / 28; }
             .hero-banner.show + .container { padding-top: 12px; }
         }
+
+        /* ══ v30 ══ */
+        /* pallini della copertina in alto: al centro da PC/tablet */
+        @media (min-width: 600px) {
+            #heroBanner .hero-dots { width: var(--hero-w, 100vw); margin-left: calc(-1 * var(--hero-pl, 0px)); position: relative; z-index: 3; }
+        }
+        /* mentre guardi un film la pagina dietro non si disegna: meno lavoro e meno memoria per il telefono */
+        body.mm-playing > header, body.mm-playing > #homeAvatarRow, body.mm-playing > #heroBanner,
+        body.mm-playing > .container, body.mm-playing > nav.nav { visibility: hidden !important; }
+        body.mm-playing .img-shimmer:not(.loaded), body.mm-playing .shimmer { animation: none !important; }
+        /* Libreria: Preferiti / Visti / Classifica separati */
+        .lib-tab .lib-n { display: inline-block; min-width: 18px; margin-left: 6px; padding: 1px 6px; border-radius: 99px; background: rgba(255,255,255,0.12); font-size: 11.5px; font-weight: 700; color: rgba(255,255,255,0.75); }
+        .lib-tab.active .lib-n { background: rgba(229,9,20,0.85); color: #fff; }
+        .lib-tools { display: flex; gap: 8px; margin: 0 0 14px; }
+        .lib-tools .rank-search-input { height: 42px; }
+        .lib-sort { flex: 0 0 auto; height: 42px; border: 0; border-radius: 12px; background: rgba(255,255,255,0.1); color: #fff; padding: 0 10px; font: 600 14px var(--sora, inherit); }
+        .lib-sort option { background: #111; color: #fff; }
+        .lib-more { width: 100%; height: 46px; margin-top: 12px; border: 0; border-radius: 14px; background: rgba(255,255,255,0.08); color: #fff; font-size: 14.5px; font-weight: 600; cursor: pointer; }
+        .lib-empty-filter { padding: 26px 8px; text-align: center; color: rgba(255,255,255,0.55); font-size: 14px; }
+        /* avviso del player (server lento / connessione) */
+        .mm-pnote { display: none; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: #141417; box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.1); font-size: 13.5px; color: rgba(255,255,255,0.8); }
+        .mm-pnote.show { display: flex; }
+        .mm-pnote span { flex: 1; min-width: 0; }
+        .mm-pnote button { flex: 0 0 auto; border: 0; border-radius: 99px; padding: 8px 14px; background: var(--red-grad, #e50914); color: #fff; font: 800 12.5px var(--sora, inherit); cursor: pointer; }
+        /* offline: l'app si apre lo stesso, con la tua libreria */
+        .app-offline-indicator span { white-space: nowrap; }
     </style>
 </head>
 <body>
@@ -1535,6 +1564,7 @@
                 <div class="player-shield-icon"><i class="fa-solid fa-hand-pointer"></i></div>
                 <div class="player-shield-text">Tocca per continuare</div>
             </div>
+            <div id="mmPlayerNote" class="mm-pnote" role="status"><span id="mmPlayerNoteText"></span><button type="button" id="mmPlayerNoteBtn">Riprova</button></div>
         </div>
         <button id="skipIntroBtn" class="btn-skip-intro" onclick="skipIntro()"><i class="fa-solid fa-forward"></i> Salta intro</button>
         
@@ -1596,6 +1626,41 @@
 </nav>
 
 <script>
+    // ── v30: i dati che arrivano da TMDB non possono contenere codice ──
+    // Le schede TMDB le puo' modificare chiunque: titoli, trame e nomi passano
+    // da qui prima di arrivare all'app (niente < > ` \ e virgolette dritte,
+    // percorsi delle immagini e chiavi dei trailer solo nel formato previsto).
+    (function () {
+        const bad = { __proto__: 1, constructor: 1, prototype: 1 };
+        const txt = (s) => s.replace(/[<>`\\]/g, '').replace(/"/g, '”').replace(/'/g, '’').replace(/&(?=#?[A-Za-z0-9]{1,10};)/g, '＆');
+        const clean = (v, k) => {
+            if (v == null || typeof v === 'boolean') return v;
+            if (typeof v === 'number') return isFinite(v) ? v : 0;
+            if (Array.isArray(v)) return v.map((x) => clean(x, k));
+            if (typeof v === 'object') {
+                const o = {};
+                for (const kk in v) if (Object.prototype.hasOwnProperty.call(v, kk) && !bad[kk]) o[kk] = clean(v[kk], kk);
+                return o;
+            }
+            if (typeof v !== 'string') return null;
+            if (/_path$/.test(k)) return /^\/[A-Za-z0-9_.-]{1,120}$/.test(v) ? v : null;
+            if (k === 'key') return /^[A-Za-z0-9_-]{1,64}$/.test(v) ? v : '';
+            if (k === 'id' || k === 'credit_id' || k === 'imdb_id') return /^[A-Za-z0-9_-]{1,64}$/.test(v) ? v : null;
+            return txt(v);
+        };
+        window.mmCleanTmdb = (data) => clean(data, '');
+        const nativeFetch = window.fetch.bind(window);
+        window.fetch = async function (input, init) {
+            const res = await nativeFetch(input, init);
+            const url = typeof input === 'string' ? input : (input && input.url) || '';
+            if (url.indexOf('https://api.themoviedb.org/') !== 0 || !res.ok) return res;
+            try {
+                const data = await res.clone().json();
+                return new Response(JSON.stringify(clean(data, '')), { status: res.status, statusText: res.statusText, headers: { 'Content-Type': 'application/json' } });
+            } catch (e) { return res; }
+        };
+    })();
+
     // ── MoodMovie v6: immagini nitide per ogni schermo ──
     // Sceglie la misura TMDB giusta per quanto l'immagine e' grande sullo
     // schermo (e per la densita' dei pixel): niente copertine sgranate,
@@ -1926,12 +1991,27 @@
             const img = new Image();
             img.className = 'hero-logo mm-logo-in';
             img.alt = '';
-            img.onload = () => { h1.prepend(img); h1.classList.add('has-logo'); };
+            // v30: la copertina puo' essere ridisegnata mentre il logo si carica
+            // (es. all'avvio): un solo logo per titolo, mai due uno sopra l'altro
+            img.onload = () => {
+                if (!h1.isConnected || h1.classList.contains('has-logo') || h1.querySelector('.hero-logo')) return;
+                h1.prepend(img); h1.classList.add('has-logo');
+            };
             img.src = logo;
         });
+        mmHeroDotsPos();
         const nx = _heroItems[(_heroIdx + 1) % _heroItems.length];
         if (nx && !((mode + nx.id) in mmLogoCache)) mmFetchLogo(mode, nx.id);
     }
+    // v30: da PC/tablet i pallini stanno al centro della copertina, non sotto al testo a sinistra
+    function mmHeroDotsPos() {
+        const hero = document.getElementById('heroBanner');
+        const box = hero && hero.querySelector('.hero-content');
+        if (!box) return;
+        hero.style.setProperty('--hero-w', hero.clientWidth + 'px');
+        hero.style.setProperty('--hero-pl', (parseFloat(getComputedStyle(box).paddingLeft) || 0) + 'px');
+    }
+    window.addEventListener('resize', () => { clearTimeout(window._mmDotsT); window._mmDotsT = setTimeout(mmHeroDotsPos, 120); }, { passive: true });
     function mmHeroFavIcon(btn) {
         const on = btn.classList.contains('active');
         btn.innerHTML = '<i class="fa-solid ' + (on ? 'fa-check' : 'fa-plus') + '"></i>';
@@ -3012,11 +3092,16 @@
     window.addEventListener('message', (e) => {
         const c = _vixsrcCtx;
         if (!c || !c.original || !e.data) return;
+        // v30: solo messaggi che arrivano davvero dal player (o dai suoi riquadri interni)
+        const pf = document.querySelector('#videoPlayer iframe');
+        let w = e.source, fromPlayer = false;
+        try { for (let i = 0; i < 6 && w; i++) { if (pf && w === pf.contentWindow) { fromPlayer = true; break; } if (w === w.parent) break; w = w.parent; } } catch (err) { return; }
+        if (!fromPlayer) return;
         let d = e.data;
-        if (typeof d === 'string') { try { d = JSON.parse(d); } catch (err) { return; } }
+        if (typeof d === 'string') { if (d.length > 4000) return; try { d = JSON.parse(d); } catch (err) { return; } }
         const ev = d && (d.event || d.data || d);
         const t = ev && (typeof ev.currentTime === 'number' ? ev.currentTime : typeof ev.time === 'number' ? ev.time : null);
-        if (t == null || t < 0) return;
+        if (t == null || !isFinite(t) || t < 0 || t > 6 * 3600) return;
         const dur = typeof ev.duration === 'number' && ev.duration > 0 ? ev.duration : c.runtime;
         _origExact = true;
         c.lastKnownTime = t;
@@ -3029,7 +3114,8 @@
         if (!iframe || e.source !== iframe.contentWindow) return;
         if (!e.data || e.data.type !== 'PLAYER_EVENT') return;
         const d = e.data.event;
-        if (!d || typeof d.currentTime !== 'number') return;
+        if (!d || typeof d.currentTime !== 'number' || !isFinite(d.currentTime) || d.currentTime < 0 || d.currentTime > 6 * 3600) return;
+        if (d.duration != null && (typeof d.duration !== 'number' || !isFinite(d.duration) || d.duration < 0)) d.duration = 0;
         // Fix "Riprendi da...": col Risparmio energetico su iPhone l'autoplay
         // del player embed può fallire, e in quel caso il player ignora il
         // parametro di ripresa e resta fermo a 0. Se il primo aggiornamento
@@ -3293,7 +3379,7 @@
             window._resumeItem = null;
             // Resetta il minutaggio salvato in Continua a guardare (mantenendo stagione/episodio correnti)
             updateContinueWatching(id, title, data.poster_path || data.backdrop_path, type, 0.05, 0, type === 'tv' ? selectedSeason : undefined, type === 'tv' ? selectedEpisode : undefined);
-            _vixsrcCtx = { id, title, poster_path: data.poster_path || data.backdrop_path, mode: type };
+            _vixsrcCtx = { id, title, poster_path: data.poster_path || data.backdrop_path, mode: type, embedUrl };
             watchBtn.innerHTML = `<i class="fa-solid fa-play" style="margin-right:8px"></i> Guarda ora`;
             restartBtn.style.display = 'none';
         };
@@ -4051,12 +4137,12 @@
         // Aggiorna la Libreria solo se è davvero la sezione attualmente visibile:
         // altrimenti (es. dopo una sincronizzazione in arrivo mentre si è su
         // Film/Serie TV) non deve sovrascrivere il contenuto mostrato.
-        if (currentView === 'favs' && libActiveTab === 'watched') {
-            const content = document.getElementById('libContent');
-            if (content) renderWatchedAndRankingTab(content);
-            else renderLibrary('watched');
-        }
-        else if (currentView === 'favs') renderLibrary(libActiveTab || 'favs');
+        if (currentView !== 'favs') return;
+        const content = document.getElementById('libContent');
+        if (!content) { renderLibrary(libActiveTab || 'favs'); return; }
+        if (libActiveTab === 'watched') { mmUpdateLibCounts(); renderWatchedTab(content); }
+        else if (libActiveTab === 'ranking') { mmUpdateLibCounts(); renderRankingTab(content); }
+        else renderLibrary(libActiveTab || 'favs');
     }
 
     function saveWatched() { localStorage.setItem(pKey('watchedMovies'), JSON.stringify(watchedMovies)); pushSync('watchedMovies'); syncTasteSeeds(); }
@@ -4081,18 +4167,34 @@
         renderLibrary('favs');
     }
 
+    // v30: testo sicuro dentro l'HTML (titoli e recensioni)
+    function mmEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
+    // v30: Preferiti / Visti / Classifica in tre schede separate: la classifica
+    // non sta piu' in fondo a una lista di visti lunghissima
+    let _libQ = '', _libSort = 'recent', _libShown = 30;
+    function mmLibTab(id, label, n, tab) {
+        return `<div class="lib-tab ${tab===id?'active':''}" data-tab="${id}" onclick="renderLibrary('${id}')">${label}<span class="lib-n">${n}</span></div>`;
+    }
+    function mmUpdateLibCounts() {
+        const set = (id, n) => { const e = document.querySelector('.lib-tab[data-tab="' + id + '"] .lib-n'); if (e) e.textContent = n; };
+        set('favs', favorites.length); set('watched', watchedMovies.length); set('ranking', rankingMovies.length);
+    }
     function renderLibrary(tab) {
+        if (tab !== 'watched' && tab !== 'ranking') tab = 'favs';
+        if (tab !== libActiveTab) _libShown = 30;
         libActiveTab = tab;
         const grid = document.getElementById('movieGrid');
         grid.className = 'lib-container';
         grid.innerHTML = `
           <div class="lib-tabs">
-            <div class="lib-tab ${tab==='favs'?'active':''}" onclick="renderLibrary('favs')"><i class="fa-solid fa-heart" style="margin-right:6px;"></i>Preferiti</div>
-            <div class="lib-tab ${tab==='watched'?'active':''}" onclick="renderLibrary('watched')"><i class="fa-solid fa-star" style="margin-right:6px;"></i>Visti & Classifica</div>
+            ${mmLibTab('favs', 'Preferiti', favorites.length, tab)}
+            ${mmLibTab('watched', 'Visti', watchedMovies.length, tab)}
+            ${mmLibTab('ranking', 'Classifica', rankingMovies.length, tab)}
           </div>
           <div id="libContent"></div>`;
         const content = document.getElementById('libContent');
-        if (tab === 'watched') renderWatchedAndRankingTab(content);
+        if (tab === 'watched') renderWatchedTab(content);
+        else if (tab === 'ranking') renderRankingTab(content);
         else renderFavsTab(content);
     }
 
@@ -4103,24 +4205,65 @@
         if (favorites.length === 0) { g.innerHTML = `<div style="grid-column:1/-1;">${emptyStateHTML('fa-heart', 'Nessun preferito ancora')}</div>`; container.appendChild(g); return; }
         favorites.forEach((item, index) => {
             const card = document.createElement('div');
-            card.className = 'movie-card'; card.dataset.id = item.id; card.dataset.mode = item.type || currentMode;
-            card.innerHTML = `<button class="fav-btn active" onclick="toggleFav(event,${item.id},'','','${item.type}'); showFavs()"><i class="fa-solid fa-heart"></i></button><img class="img-shimmer" src="https://image.tmdb.org/t/p/w342${item.poster_path}" srcset="https://image.tmdb.org/t/p/w342${item.poster_path} 342w, https://image.tmdb.org/t/p/w500${item.poster_path} 500w, https://image.tmdb.org/t/p/w780${item.poster_path} 780w" sizes="(min-width: 1800px) 240px, (min-width: 1024px) 13vw, (min-width: 600px) 22vw, 34vw" loading="lazy" onload="this.classList.add('loaded')">`;
-            card.onclick = () => openModal(item.id, item.type);
+            const type = item.type === 'tv' ? 'tv' : 'movie';
+            card.className = 'movie-card'; card.dataset.id = item.id; card.dataset.mode = type;
+            card.innerHTML = `<button class="fav-btn active" onclick="toggleFav(event,${Number(item.id)},'','','${type}'); showFavs()"><i class="fa-solid fa-heart"></i></button><img class="img-shimmer" alt="${mmEsc(item.title)}" src="https://image.tmdb.org/t/p/w342${item.poster_path}" srcset="https://image.tmdb.org/t/p/w342${item.poster_path} 342w, https://image.tmdb.org/t/p/w500${item.poster_path} 500w, https://image.tmdb.org/t/p/w780${item.poster_path} 780w" sizes="(min-width: 1800px) 240px, (min-width: 1024px) 13vw, (min-width: 600px) 22vw, 34vw" loading="lazy" onload="this.classList.add('loaded')">`;
+            card.onclick = () => openModal(item.id, type);
             g.appendChild(card);
             setTimeout(() => card.classList.add('show'), Math.min(index, 10) * 18);
         });
         container.appendChild(g);
     }
 
-    function renderWatchedAndRankingTab(container) {
+    function mmWatchedItem(item, idx) {
+        const el = document.createElement('div');
+        el.className = 'watched-item';
+        const stars = [1,2,3,4,5].map(n => `<i class="fa-solid fa-star ${(item.stars||0)>=n?'lit':''}" onclick="setWatchedStars(${idx},${n})"></i>`).join('');
+        const hasReview = item.review && String(item.review).trim();
+        const mt = item.mediaType === 'tv' ? 'tv' : 'movie';
+        el.innerHTML = `
+          <img class="watched-poster" loading="lazy" alt="" src="https://image.tmdb.org/t/p/w185${item.poster_path}" onclick="openModal(${Number(item.id)},'${mt}')">
+          <div class="watched-info">
+            <div class="watched-title">${mmEsc(item.title)}</div>
+            <div class="star-row">${stars}</div>
+            ${hasReview ? `<div class="review-display has-review">"${mmEsc(item.review)}"</div>` : '<div class="review-display"></div>'}
+            <div class="review-toggle" onclick="toggleReview(${idx})">${hasReview?'Modifica':'+ Recensione'}</div>
+            <div class="review-box" id="reviewBox${idx}">
+              <textarea rows="3" placeholder="Scrivi cosa ne pensi..." id="reviewText${idx}">${mmEsc(item.review||'')}</textarea>
+              <button class="review-save-btn" onclick="saveReview(${idx})">Salva</button>
+            </div>
+          </div>
+          <button class="watched-del" onclick="removeWatched(${idx})"><i class="fa-solid fa-xmark"></i></button>`;
+        return el;
+    }
+
+    function mmWatchedFiltered() {
+        const q = _libQ.trim().toLowerCase();
+        let rows = watchedMovies.map((item, idx) => ({ item, idx }));
+        if (q) rows = rows.filter((r) => String(r.item.title || '').toLowerCase().includes(q));
+        if (_libSort === 'stars') rows.sort((a, b) => (b.item.stars || 0) - (a.item.stars || 0) || b.idx - a.idx);
+        else if (_libSort === 'az') rows.sort((a, b) => String(a.item.title || '').localeCompare(String(b.item.title || ''), 'it'));
+        else rows.reverse(); // piu' recenti prima
+        return rows;
+    }
+
+    function mmFillWatchedList(list) {
+        list.innerHTML = '';
+        if (watchedMovies.length === 0) { list.innerHTML = emptyStateHTML('fa-eye-slash', 'Nessun film segnato come visto'); return; }
+        const rows = mmWatchedFiltered();
+        if (rows.length === 0) { list.innerHTML = '<div class="lib-empty-filter">Nessun titolo trovato</div>'; return; }
+        rows.slice(0, _libShown).forEach((r) => list.appendChild(mmWatchedItem(r.item, r.idx)));
+        if (rows.length > _libShown) {
+            const more = document.createElement('button');
+            more.className = 'lib-more';
+            more.textContent = `Mostra altri (${rows.length - _libShown})`;
+            more.onclick = () => { _libShown += 30; mmFillWatchedList(list); };
+            list.appendChild(more);
+        }
+    }
+
+    function renderWatchedTab(container) {
         container.innerHTML = '';
-
-        // ── SEZIONE VISTI ──
-        const watchedHeader = document.createElement('div');
-        watchedHeader.className = 'wc-subsection-title';
-        watchedHeader.innerHTML = '<i class="fa-solid fa-eye"></i> Film Visti';
-        container.appendChild(watchedHeader);
-
         const addBtn = document.createElement('button');
         addBtn.className = 'add-watched-btn';
         addBtn.innerHTML = '<i class="fa-solid fa-plus"></i> Aggiungi film o serie';
@@ -4129,38 +4272,25 @@
 
         const list = document.createElement('div');
         list.className = 'watched-list';
-        if (watchedMovies.length === 0) {
-            list.innerHTML = emptyStateHTML('fa-eye-slash', 'Nessun film segnato come visto');
-        } else {
-            watchedMovies.forEach((item, idx) => {
-                const el = document.createElement('div');
-                el.className = 'watched-item';
-                const stars = [1,2,3,4,5].map(n => `<i class="fa-solid fa-star ${(item.stars||0)>=n?'lit':''}" onclick="setWatchedStars(${idx},${n})"></i>`).join('');
-                const hasReview = item.review && item.review.trim();
-                el.innerHTML = `
-                  <img class="watched-poster" src="https://image.tmdb.org/t/p/w185${item.poster_path}" onclick="openModal(${item.id},'${item.mediaType||'movie'}')">
-                  <div class="watched-info">
-                    <div class="watched-title">${item.title}</div>
-                    <div class="star-row">${stars}</div>
-                    ${hasReview ? `<div class="review-display has-review">"${item.review}"</div>` : '<div class="review-display"></div>'}
-                    <div class="review-toggle" onclick="toggleReview(${idx})">${hasReview?'Modifica':'+ Recensione'}</div>
-                    <div class="review-box" id="reviewBox${idx}">
-                      <textarea rows="3" placeholder="Scrivi cosa ne pensi..." id="reviewText${idx}">${item.review||''}</textarea>
-                      <button class="review-save-btn" onclick="saveReview(${idx})">Salva</button>
-                    </div>
-                  </div>
-                  <button class="watched-del" onclick="removeWatched(${idx})"><i class="fa-solid fa-xmark"></i></button>`;
-                list.appendChild(el);
-            });
-        }
+        if (watchedMovies.length > 6) {
+            const tools = document.createElement('div');
+            tools.className = 'lib-tools';
+            tools.innerHTML = `<input class="rank-search-input" id="libWatchedQ" type="text" inputmode="search" placeholder="Cerca nei visti..." autocomplete="off">
+              <select class="lib-sort" id="libWatchedSort" aria-label="Ordina">
+                <option value="recent">Recenti</option><option value="stars">Voto</option><option value="az">A-Z</option>
+              </select>`;
+            container.appendChild(tools);
+            const qi = tools.querySelector('#libWatchedQ'), si = tools.querySelector('#libWatchedSort');
+            qi.value = _libQ; si.value = _libSort;
+            qi.addEventListener('input', () => { _libQ = qi.value; _libShown = 30; mmFillWatchedList(list); });
+            si.addEventListener('change', () => { _libSort = si.value; _libShown = 30; mmFillWatchedList(list); });
+        } else { _libQ = ''; }
         container.appendChild(list);
+        mmFillWatchedList(list);
+    }
 
-        // ── SEZIONE CLASSIFICA ──
-        const rankHeader = document.createElement('div');
-        rankHeader.className = 'wc-subsection-title';
-        rankHeader.innerHTML = '<i class="fa-solid fa-trophy"></i> La mia Classifica';
-        container.appendChild(rankHeader);
-
+    function renderRankingTab(container) {
+        container.innerHTML = '';
         const searchRow = document.createElement('div');
         searchRow.innerHTML = `
           <div class="rank-search-row">
@@ -4186,7 +4316,8 @@
         }
     }
 
-    function renderWatchedTab(container) { renderWatchedAndRankingTab(container); }
+    // compatibilita' con il codice esistente
+    function renderWatchedAndRankingTab(container) { renderWatchedTab(container); }
 
     function setWatchedStars(idx, n) {
         watchedMovies[idx].stars = n;
@@ -4280,8 +4411,8 @@
           <div class="rank-num-wrap">
             <span class="rank-num ${idx<3?'top3':''}">${idx+1}</span>
           </div>
-          <img class="rank-poster" src="https://image.tmdb.org/t/p/w185${item.poster_path}" onclick="openModal(${item.id},'${item.mediaType||'movie'}')">
-          <span class="rank-title">${item.title}</span>
+          <img class="rank-poster" src="https://image.tmdb.org/t/p/w185${item.poster_path}" onclick="openModal(${Number(item.id)},'${item.mediaType==='tv'?'tv':'movie'}')">
+          <span class="rank-title">${mmEsc(item.title)}</span>
           <div class="rank-move-btns">
             <button class="rank-move-btn" onclick="moveRankItem(${idx},-1)" ${idx===0?'disabled':''}><i class="fa-solid fa-chevron-up"></i></button>
             <button class="rank-move-btn" onclick="moveRankItem(${idx},1)" ${idx===rankingMovies.length-1?'disabled':''}><i class="fa-solid fa-chevron-down"></i></button>
@@ -4655,55 +4786,30 @@
         return null; // popup automatico non richiesto: bloccato
     };
 
-    // Focus guard: riporta il focus sulla pagina quando l'iframe lo prende
-    // MA solo se NON c'è stata una interazione recente dell'utente
-    const focusGuard = setInterval(function() {
-        const player = document.getElementById('videoPlayer');
-        if (player && player.style.display === 'block') {
-            if (document.activeElement && document.activeElement.tagName === 'IFRAME') {
-                if (!userInteracting) {
-                    // Nessun click recente: è un popup automatico, lo blocchiamo
-                    window.focus();
-                    document.activeElement.blur();
-                }
-                // Se c'è stata interazione, lasciamo passare (è un click volontario dell'utente)
-            }
-        }
-    }, 50);
+    // v30: tolto il vecchio "focus guard" (un controllo ogni 50 ms che toglieva
+    // il focus al player): non fermava nessun pop-up (quelli nascono dentro il
+    // player, fuori dalla nostra portata) e sul telefono, dove i tocchi dentro il
+    // player non arrivano alla pagina, strappava il focus al video ad ogni tocco
+    // e teneva il processore sveglio 20 volte al secondo durante il film.
 
-    // Blocca redirect automatici della pagina principale
-    const screen = document.getElementById('offlineScreen');
-    if (screen) {
-        // Mostra schermo offline SOLO se il caricamento iniziale avviene offline
-        const wasInitiallyOffline = !navigator.onLine;
-        screen.style.display = wasInitiallyOffline ? 'flex' : 'none';
-
-        // Quando torna online, nascondi sempre lo schermo
-        window.addEventListener('online', function() {
-            screen.style.display = 'none';
-        });
-
-        // IMPORTANTE: NON aggiungere listener per 'offline'
-        // così lo schermo NON appare se l'utente va offline dopo il caricamento
-    }
+    // v30: la pagina si apre anche senza rete (niente piu' schermata nera
+    // "Sei offline" che bloccava tutto): libreria e titoli gia' visti restano
+    // consultabili, i film ovviamente richiedono la connessione.
+    const offlineScreenEl = document.getElementById('offlineScreen');
+    if (offlineScreenEl) offlineScreenEl.style.display = 'none';
 
     // Gestione indicatore offline in-app
     const offlineIndicator = document.getElementById('appOfflineIndicator');
     if (offlineIndicator) {
-        window.addEventListener('offline', function() {
-            if (!screen || screen.style.display === 'none') {
-                offlineIndicator.classList.add('show');
-            }
-        });
-
-        window.addEventListener('online', function() {
-            offlineIndicator.classList.remove('show');
-        });
-
-        // Se siamo offline all'avvio ma per qualche motivo lo schermo intero non è visibile
-        if (!navigator.onLine && (!screen || screen.style.display === 'none')) {
-            offlineIndicator.classList.add('show');
-        }
+        const offText = offlineIndicator.querySelector('span');
+        const setOff = (off) => {
+            if (offText) offText.textContent = 'Sei offline · la tua libreria resta disponibile';
+            offlineIndicator.classList.toggle('show', off);
+            if (off) { clearTimeout(window._mmOffT); window._mmOffT = setTimeout(() => offlineIndicator.classList.remove('show'), 6000); }
+        };
+        window.addEventListener('offline', () => setOff(true));
+        window.addEventListener('online', () => setOff(false));
+        if (!navigator.onLine) setOff(true);
     }
 
     // Blocca i redirect automatici della pagina SOLO se non c'è stata un'interazione
@@ -4717,6 +4823,132 @@
             return '';
         }
     });
+
+    // ══ v30: PLAYER — niente blocchi infiniti, niente sorprese dai siti esterni ══
+    (function () {
+        const player = document.getElementById('videoPlayer');
+        const note = document.getElementById('mmPlayerNote');
+        const noteText = document.getElementById('mmPlayerNoteText');
+        const noteBtn = document.getElementById('mmPlayerNoteBtn');
+        const STALL_MS = 14000;     // fermo da 14 s mentre dovrebbe andare = bloccato
+        const NOSTART_MS = 25000;   // nessuna risposta dal server dopo 25 s
+        const MAX_AUTO = 3;         // al massimo 3 recuperi automatici ogni 10 minuti
+        let st = null;              // stato della visione in corso
+        let watchT = null;
+
+        const frame = () => player.querySelector('iframe');
+        const isVix = () => !!(_vixsrcCtx && !_vixsrcCtx.original && _vixsrcCtx.embedUrl);
+        const showNote = (text, btnText, fn) => {
+            noteText.textContent = text;
+            noteBtn.textContent = btnText || 'Riprova';
+            noteBtn.onclick = (e) => { e.stopPropagation(); hideNote(); if (fn) fn(); };
+            note.classList.add('show');
+        };
+        const hideNote = () => note.classList.remove('show');
+
+        // riapre il player esattamente dal punto in cui si era fermato
+        function reload(reason) {
+            const f = frame();
+            if (!f || !isVix()) return;
+            const c = _vixsrcCtx;
+            const t = Math.max(0, Math.floor((typeof c.lastKnownTime === 'number' ? c.lastKnownTime : (c.expectedStart || 0)) - 3));
+            let u = setUrlParam(c.embedUrl, 'autoplay', 'true');
+            u = t > 0 ? setUrlParam(u, 'startAt', t) : u;
+            u = setUrlParam(u, '_r', String(Date.now() % 100000));
+            c.expectedStart = t; c.checked = true;
+            st = { state: 'loading', lastMove: Date.now(), opened: Date.now(), got: false, auto: st ? st.auto : [], noted: false };
+            f.src = u;
+            st.src = f.src;
+            if (reason === 'auto') mmToast('Connessione lenta: riprendo da dove eri');
+        }
+        window.mmPlayerReload = reload;
+
+        function recover() {
+            const now = Date.now();
+            st.auto = st.auto.filter((x) => now - x < 600000);
+            if (st.auto.length >= MAX_AUTO) {
+                st.lastMove = now;
+                if (!note.classList.contains('show')) showNote('La connessione è molto lenta in questo momento.', 'Riprova', () => reload('user'));
+                return;
+            }
+            st.auto.push(now);
+            reload('auto');
+        }
+
+        function tick() {
+            if (!st || !isVix() || !frame()) return;
+            const now = Date.now();
+            // il player e' stato ricaricato (salta intro, nuovo tentativo...): si riparte da capo
+            const src = frame().src;
+            if (src !== st.src) { st.src = src; st.state = 'loading'; st.lastMove = now; st.opened = now; st.got = false; return; }
+            // app in secondo piano o senza rete: si aspetta, senza contare il tempo
+            if (document.visibilityState !== 'visible' || navigator.onLine === false) { st.lastMove = now; return; }
+            if (st.state === 'playing' && now - st.lastMove > STALL_MS) { recover(); return; }
+            if (!st.got && !st.noted && autoplaySetting && now - st.opened > NOSTART_MS) {
+                st.noted = true;
+                showNote('Il server del film non risponde.', 'Riprova', () => reload('user'));
+            }
+        }
+
+        // quando nel riquadro compare (o sparisce) un player
+        new MutationObserver(() => {
+            const has = !!frame();
+            document.body.classList.toggle('mm-playing', has);
+            hideNote();
+            clearInterval(watchT);
+            if (has) {
+                st = { state: autoplaySetting ? 'loading' : 'idle', lastMove: Date.now(), opened: Date.now(), got: false, auto: [], noted: false, src: frame().src };
+                watchT = setInterval(tick, 3000);
+            } else st = null;
+        }).observe(player, { childList: true });
+
+        // eventi reali del player (solo dal riquadro del film, mai da altre finestre)
+        window.addEventListener('message', (e) => {
+            if (!st || e.origin !== 'https://vixsrc.to') return;
+            const f = frame();
+            if (!f || e.source !== f.contentWindow || !e.data || e.data.type !== 'PLAYER_EVENT') return;
+            const d = e.data.event;
+            if (!d || typeof d.event !== 'string') return;
+            st.got = true;
+            if (note.classList.contains('show') && d.event !== 'pause') hideNote();
+            const now = Date.now();
+            if (d.event === 'pause') st.state = 'paused';
+            else if (d.event === 'play') { st.state = 'playing'; st.lastMove = now; }
+            else if (d.event === 'seeked') st.lastMove = now;
+            else if (d.event === 'timeupdate') {
+                if (st.state !== 'paused') st.state = 'playing';
+                if (typeof d.currentTime === 'number' && d.currentTime !== st.lastT) { st.lastT = d.currentTime; st.lastMove = now; }
+            }
+        });
+
+        // rete tornata o cambiata (Wi-Fi -> 4G) mentre il film era fermo: riparte subito
+        const netBack = () => {
+            if (!st || st.state !== 'playing' || !isVix()) return;
+            if (Date.now() - st.lastMove > 5000) recover();
+        };
+        window.addEventListener('online', () => setTimeout(netBack, 1500));
+        if (navigator.connection && navigator.connection.addEventListener) navigator.connection.addEventListener('change', () => setTimeout(netBack, 2500));
+        document.addEventListener('visibilitychange', () => { if (st && document.visibilityState === 'visible') st.lastMove = Date.now(); });
+
+        // senza rete i tasti del player avvisano invece di aprire un riquadro vuoto
+        document.addEventListener('click', (e) => {
+            if (navigator.onLine !== false) return;
+            if (!e.target.closest || !e.target.closest('#watchNowBtn, #restartBtn, #watchOriginalBtn, #trailerTrigger, .hero-btn-play')) return;
+            e.preventDefault(); e.stopPropagation();
+            mmToast('Sei offline: per guardare serve la connessione');
+        }, true);
+
+        // nessun sito esterno puo' portare via l'app mentre guardi un film
+        if (window.navigation && window.navigation.addEventListener) {
+            window.navigation.addEventListener('navigate', (e) => {
+                try {
+                    if (!document.body.classList.contains('mm-playing') || userInteracting || !e.cancelable) return;
+                    const to = new URL(e.destination.url);
+                    if (to.origin !== location.origin) e.preventDefault();
+                } catch (err) { /* niente */ }
+            });
+        }
+    })();
 
 
     // ══ MoodMovie Cinema: comportamento della nuova interfaccia ══
@@ -4910,7 +5142,7 @@
                 img.className = 'sheet-logo';
                 img.alt = '';
                 const lt0 = Date.now();
-                img.onload = () => { if (Date.now() - lt0 > 1600) return; if (window._mmSheet && window._mmSheet.data === data) { title.prepend(img); title.classList.add('has-logo'); } };
+                img.onload = () => { if (Date.now() - lt0 > 1600) return; if (window._mmSheet && window._mmSheet.data === data) { title.querySelectorAll('.sheet-logo').forEach((n) => { if (n !== img) n.remove(); }); title.prepend(img); title.classList.add('has-logo'); } };
                 img.src = logo;
                 if (img.complete && img.naturalWidth) { const now = img.onload; img.onload = null; now(); }
             }

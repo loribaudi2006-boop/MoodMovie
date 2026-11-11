@@ -1362,14 +1362,14 @@
         .hero-slide.active, .hero-slide.leaving { will-change: opacity, transform; }
         .hero-slide .hero-banner-bg { animation: none !important; will-change: auto; }
         .hero-slide.leaving { animation: mmHeroZout 1.1s ease both; }
-        .hero-slide.mm-z0 { animation: mmHeroZ0 7.6s cubic-bezier(.3,.45,.6,1) both; }
-        .hero-slide.mm-zin { animation: mmHeroZin 7.6s linear both; }
-        @keyframes mmHeroZin {
-            0% { transform: scale(1.12); animation-timing-function: cubic-bezier(.2,.6,.6,.85); }
-            18% { transform: scale(1.06); animation-timing-function: cubic-bezier(.25,.45,.6,1); }
-            100% { transform: none; }
-        }
-        @keyframes mmHeroZ0 { from { transform: scale(1.06); } to { transform: none; } }
+        /* v33: un solo movimento continuo: l'entrata e lo zoom sono la stessa curva
+           (piu' veloce all'inizio, poi sempre piu' lenta ma mai ferma) e dura
+           esattamente quanto la copertina resta sullo schermo (7 s + dissolvenza) */
+        .hero-slide.mm-z0 { animation: mmHeroZ0 8.2s cubic-bezier(.25,.5,.55,.8) both; }
+        .hero-slide.mm-zin { animation: mmHeroZin 8.2s cubic-bezier(.25,.5,.55,.8) both; }
+        @keyframes mmHeroZin { from { transform: scale(1.14); } to { transform: none; } }
+        @keyframes mmHeroZ0 { from { transform: scale(1.07); } to { transform: none; } }
+        .hero-banner.mm-hold .hero-slide { animation-play-state: paused; }
         @keyframes mmHeroZout { from { transform: none; } to { transform: scale(1.03); } }
         .hero-banner.is-offscreen .hero-slide, body.mm-modal-open .hero-slide { animation-play-state: paused; }
         @media (min-width: 600px) { .hero-slide { transform-origin: 62% 40%; } #heroBanner { -webkit-user-select: none; user-select: none; } }
@@ -1384,14 +1384,9 @@
         #libContent.mm-lib-l { animation: mmLibL .38s var(--bezier) both; }
         @keyframes mmLibR { from { opacity: 0; transform: translateX(22px); } to { opacity: 1; transform: none; } }
         @keyframes mmLibL { from { opacity: 0; transform: translateX(-22px); } to { opacity: 1; transform: none; } }
-        /* v32: "Immagine migliorata" nel player */
-        .mm-enh-btn { display: none; align-items: center; gap: 8px; margin: 10px 8px 0 0; padding: 10px 16px; border: 0; border-radius: 99px; background: rgba(255,255,255,0.12); color: #fff; font-size: 13.5px; font-weight: 600; cursor: pointer; transition: background .25s, box-shadow .25s; }
-        body.mm-playing .mm-enh-btn { display: inline-flex; }
-        .mm-enh-btn .mm-enh-state { padding: 1px 8px; border-radius: 99px; background: rgba(255,255,255,0.14); font-size: 11.5px; font-weight: 800; }
-        .mm-enh-btn.on { background: rgba(229,9,20,0.16); box-shadow: inset 0 0 0 1px rgba(255,59,82,0.55); }
-        .mm-enh-btn.on .mm-enh-state { background: rgba(229,9,20,0.85); }
-        #videoPlayer iframe { transition: filter .4s ease; }
-        #videoPlayer.mm-enh iframe { filter: contrast(1.08) saturate(1.2) brightness(1.03); }
+        /* v33: qualita' video migliorata (dalle Impostazioni) */
+        #videoPlayer.mm-enh iframe { filter: url(#mmUHD) contrast(1.03); }
+        .mm-webkit #videoPlayer.mm-enh iframe { filter: contrast(1.08) saturate(1.18) brightness(1.03); }
         /* v32: scheda del titolo da PC piu' comoda: larghezza uguale a quella
            calcolata per l'animazione, immagine piu' bassa (titolo, pulsanti e
            trama si vedono subito), barra di scorrimento sottile */
@@ -2094,21 +2089,33 @@
         // v32: la copertina che esce continua il suo zoom mentre sfuma (niente scatti)
         if (out) { out.classList.add('leaving'); out.classList.remove('active'); setTimeout(() => { out.classList.remove('leaving'); if (!out.classList.contains('active')) out.classList.remove('mm-zin', 'mm-z0'); }, 1200); }
         _heroIdx = i;
+        _heroElapsed = 0;
         mmPrimeSlide(i); mmPrimeSlide(i + 1);
         const inc = slides[_heroIdx];
         if (inc) { inc.classList.remove('mm-zin', 'mm-z0', 'leaving'); void inc.offsetWidth; inc.classList.add('active', 'mm-zin'); }
         renderHeroContent(true);
         if (byUser) startHeroTimer();
     }
+    // v33: il tempo di ogni copertina si conta solo mentre si vede davvero: quando
+    // e' in pausa (scheda aperta, ricerca, banner fuori schermo) si ferma anche lo
+    // zoom, cosi' lo zoom dura sempre fino al cambio di copertina
+    let _heroElapsed = 0;
     function startHeroTimer() {
         clearInterval(_heroTimer);
+        _heroElapsed = 0;
         if (_heroItems.length < 2) return;
+        let last = performance.now();
         _heroTimer = setInterval(() => {
+            const now = performance.now(), dt = Math.min(now - last, 1000);
+            last = now;
             const hero = document.getElementById('heroBanner');
-            if (document.hidden || !hero.classList.contains('show') || hero.classList.contains('is-offscreen')
-                || document.querySelector('.modal.open') || document.body.classList.contains('mm-search-open')) return;
-            goHeroSlide(_heroIdx + 1, false);
-        }, 7000);
+            const hold = document.hidden || !hero.classList.contains('show') || hero.classList.contains('is-offscreen')
+                || !!document.querySelector('.modal.open') || document.body.classList.contains('mm-search-open');
+            if (hero.classList.contains('mm-hold') !== hold) hero.classList.toggle('mm-hold', hold);
+            if (hold) return;
+            _heroElapsed += dt;
+            if (_heroElapsed >= 7000) goHeroSlide(_heroIdx + 1, false);
+        }, 200);
     }
     function setHeroVisible(visible) {
         const hero = document.getElementById('heroBanner');
@@ -4789,6 +4796,14 @@
                 <span class="slider"></span>
               </label>
             </div>
+            <div class="wc-subsection-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Qualità video</div>
+            <div class="settings-card" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+              <p style="font-size:0.78rem; color:var(--text-dim); margin:0; line-height:1.4; flex:1;"><strong style="color:#fff;">Immagine migliorata stile 4K</strong><br>L'app rende il film più nitido e definito: dettagli più netti, più profondità e colori più vivi. Il film resta in HD, il miglioramento lo applica l'app.${window.mmEnhLite ? ' Su iPhone e iPad è disponibile una versione più leggera (solo colori e contrasto).' : ''}</p>
+              <label class="switch" style="flex-shrink:0;">
+                <input type="checkbox" id="mmEnhToggle" ${window.mmEnhOn && mmEnhOn() ? 'checked' : ''} onchange="mmSetEnhance(this.checked)">
+                <span class="slider"></span>
+              </label>
+            </div>
             <div class="wc-subsection-title"><i class="fa-solid fa-battery-half"></i> Riproduzione dei film</div>
             <div class="settings-card">
               <p style="font-size:0.78rem; color:var(--text-dim); margin:0; line-height:1.4;">Se l'app richiede di premere il tasto "Play" per avviarsi oppure la funzione "Riprendi da" non funziona e i film non riprendono dal punto in cui erano stati interrotti, disattiva il risparmio energetico.</p>
@@ -4908,31 +4923,37 @@
         if (e.target === modal && window.innerWidth >= 900 && modal.classList.contains('open')) window.closeModal();
     });
 
-    // v32: "Immagine migliorata": il film resta quello del player (massimo 1080p),
-    // l'app ci applica sopra piu' contrasto, colori e luminosita' (filtri della
-    // scheda video, leggeri). La scelta resta salvata sul dispositivo
+    // v33: "Qualita' video migliorata" (Impostazioni): il film arriva dal player in
+    // HD; l'app ci applica sopra un filtro di nitidezza come i TV "4K": dettagli
+    // fini (maschera di contrasto), contrasto locale e colori, calcolati dalla
+    // scheda video. Su iPhone/iPad (Safari) il filtro sul video non si puo'
+    // usare: li' resta la versione leggera (colori e contrasto)
     (function mmEnhance() {
-        const wrap = document.getElementById('videoPlayerWrap'), vp = document.getElementById('videoPlayer');
-        if (!wrap || !vp) return;
+        const ua = navigator.userAgent || '';
+        const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const webkitOnly = ios || (/AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg|OPR|Firefox/.test(ua));
+        if (webkitOnly) document.documentElement.classList.add('mm-webkit');
+        window.mmEnhLite = webkitOnly;
+        if (!webkitOnly) document.body.insertAdjacentHTML('beforeend',
+            '<svg width="0" height="0" style="position:absolute;width:0;height:0" aria-hidden="true" focusable="false">' +
+            '<filter id="mmUHD" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">' +
+            '<feGaussianBlur in="SourceGraphic" stdDeviation="0.8" result="b1"/>' +
+            '<feComposite in="SourceGraphic" in2="b1" operator="arithmetic" k1="0" k2="1.85" k3="-0.85" k4="0" result="s1"/>' +
+            '<feGaussianBlur in="s1" stdDeviation="10" result="b2"/>' +
+            '<feComposite in="s1" in2="b2" operator="arithmetic" k1="0" k2="1.3" k3="-0.3" k4="0" result="s2"/>' +
+            '<feColorMatrix in="s2" type="saturate" values="1.1"/>' +
+            '</filter></svg>');
         let on = false;
         try { on = localStorage.getItem('mmEnh') === '1'; } catch (e) {}
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.id = 'mmEnhBtn';
-        btn.className = 'mm-enh-btn';
-        const paint = () => {
-            vp.classList.toggle('mm-enh', on);
-            btn.classList.toggle('on', on);
-            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-            btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i> Immagine migliorata <span class="mm-enh-state">' + (on ? 'S\u00EC' : 'No') + '</span>';
-        };
-        btn.addEventListener('click', () => {
-            on = !on;
+        const apply = () => { const vp = document.getElementById('videoPlayer'); if (vp) vp.classList.toggle('mm-enh', on); };
+        window.mmEnhOn = () => on;
+        window.mmSetEnhance = (v) => {
+            on = !!v;
             try { if (on) localStorage.setItem('mmEnh', '1'); else localStorage.removeItem('mmEnh'); } catch (e) {}
-            paint();
-        });
-        paint();
-        wrap.appendChild(btn);
+            apply();
+            if (typeof window.mmToast === 'function') window.mmToast(on ? 'Qualit\u00E0 video migliorata attiva' : 'Qualit\u00E0 video migliorata disattivata');
+        };
+        apply();
     })();
 
     // Traccia se l'utente ha interagito di recente (click/touch)

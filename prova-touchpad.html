@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>MoodMovie · prova touchpad</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: #000; color: #fff; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; display: flex; justify-content: center; padding: 24px 16px; }
+  main { width: min(760px, 100%); }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  p { color: rgba(255,255,255,.7); margin: 0 0 14px; }
+  ol { color: rgba(255,255,255,.8); margin: 0 0 18px; padding-left: 20px; }
+  #pad { position: relative; height: 300px; border-radius: 18px; background: linear-gradient(135deg, #1a0a0c, #0c0c10); box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); display: grid; place-items: center; overflow: hidden; user-select: none; }
+  #pad .big { font-size: 64px; font-weight: 800; letter-spacing: -2px; }
+  #pad .small { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; color: rgba(255,255,255,.55); font-size: 13px; }
+  #pad.flash { box-shadow: inset 0 0 0 2px #e50914; }
+  .row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  button { border: 0; border-radius: 99px; padding: 12px 20px; font: 700 14px inherit; cursor: pointer; background: #e50914; color: #fff; }
+  button.ghost { background: rgba(255,255,255,.12); }
+  #msg { margin-top: 10px; min-height: 20px; color: #7ee787; font-size: 13px; }
+  #stats { margin-top: 12px; font-size: 13px; color: rgba(255,255,255,.6); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Prova del touchpad</h1>
+  <p>Serve per regolare lo scorrimento delle copertine di MoodMovie sul tuo PC. Non salva e non invia niente: i dati li copi tu.</p>
+  <ol>
+    <li>Tieni il puntatore sul riquadro e fai <b>5 scorrimenti singoli</b> verso sinistra con due dita, aspettando un secondo tra uno e l'altro.</li>
+    <li>Poi fai <b>3 scorrimenti veloci</b> di fila.</li>
+    <li>Poi <b>2 scorrimenti forti</b>, come quando le copertine "impazziscono".</li>
+    <li>Premi <b>Copia i dati</b> e incollali nella chat con Claude.</li>
+  </ol>
+  <div id="pad"><div class="big" id="count">0</div><div class="small" id="hint">cambi di copertina che l'app farebbe</div></div>
+  <div class="row"><button id="copy">Copia i dati</button><button class="ghost" id="reset">Azzera</button></div>
+  <div id="msg"></div>
+  <div id="stats"></div>
+</main>
+<script>
+(function () {
+  const pad = document.getElementById('pad'), count = document.getElementById('count'), stats = document.getElementById('stats'), msg = document.getElementById('msg');
+  let ev = [], slides = [], t0 = 0;
+  // stessa logica delle copertine dell'app (v38)
+  let hLocked = false, hAt = 0, hPrevT = 0, hPrevA = 0, hDirL = 0, hRev = 0, hWin = [];
+  function onWheel(e) {
+    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) { record(e, 0); return; }
+    e.preventDefault();
+    const now = performance.now(), gap = hPrevT ? now - hPrevT : 1e9;
+    const dx = e.deltaMode === 1 ? e.deltaX * 16 : e.deltaX, a = Math.abs(dx), dir = dx > 0 ? 1 : -1;
+    const lastA = hPrevA;
+    hPrevT = now; hPrevA = a;
+    let slid = 0;
+    if (hLocked) {
+      const since = now - hAt;
+      if (dir !== hDirL) hRev += a; else hRev = 0;
+      if (gap > 600 || (gap > 110 && since > 230 && a <= Math.max(24, lastA * 2))) { hLocked = false; hWin = []; }
+      else if (hRev > 24 && since > 180) { hLocked = false; hWin = [[now, dir * hRev]]; hRev = 0; }
+      else if (since > 1300) { hLocked = false; hWin = []; }
+    }
+    if (!hLocked) {
+      hWin.push([now, dx]);
+      while (hWin.length && now - hWin[0][0] > 220) hWin.shift();
+      let sum = 0; for (const w of hWin) sum += w[1];
+      if (Math.abs(sum) > 34) { slid = sum > 0 ? 1 : -1; hLocked = true; hAt = now; hDirL = slid; hRev = 0; hWin = []; slides.push(Math.round(now - t0)); count.textContent = slides.length; pad.classList.add('flash'); setTimeout(() => pad.classList.remove('flash'), 180); }
+    }
+    record(e, slid);
+  }
+  function record(e, slid) {
+    const now = performance.now();
+    if (!t0) t0 = now;
+    if (ev.length < 4000) ev.push([Math.round(now - t0), +e.deltaX.toFixed(2), +e.deltaY.toFixed(2), e.deltaMode, slid]);
+    stats.textContent = ev.length + ' eventi registrati';
+  }
+  pad.addEventListener('wheel', onWheel, { passive: false });
+  document.getElementById('reset').onclick = () => { ev = []; slides = []; t0 = 0; hLocked = false; hPrevT = 0; count.textContent = '0'; stats.textContent = ''; msg.textContent = ''; };
+  document.getElementById('copy').onclick = async () => {
+    const data = 'MMTOUCHPAD ' + JSON.stringify({ v: 38, ua: navigator.userAgent, dpr: devicePixelRatio, w: innerWidth, slides, ev });
+    try { await navigator.clipboard.writeText(data); msg.textContent = 'Copiato! Ora incollalo nella chat (' + ev.length + ' eventi).'; }
+    catch (err) { const ta = document.createElement('textarea'); ta.value = data; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); msg.textContent = 'Copiato! Ora incollalo nella chat.'; }
+  };
+})();
+</script>
+</body>
+</html>

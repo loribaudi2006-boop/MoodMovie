@@ -2,7 +2,7 @@
 // aprirla subito, anche con rete assente o che non risponde. Il player resta
 // sempre in rete. v30: le copertine TMDB (fino a w780) si tengono in una cache
 // a tetto fisso: niente riscaricamenti (meno dati mobili) e libreria visibile offline.
-const CACHE_NAME = 'moodmovie-shell-v51';
+const CACHE_NAME = 'moodmovie-shell-v52';
 const IMG_CACHE = 'moodmovie-img-v1';
 const IMG_MAX_ITEMS = 250;      // ~15-25 MB al massimo, poi si buttano le piu' vecchie
 let imgPuts = 0, apiPuts = 0;

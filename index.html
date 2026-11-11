@@ -1413,6 +1413,13 @@
         .mm-hdprev .l { left: 8px; } .mm-hdprev .r { right: 8px; }
         .mm-hdprev[data-hd="0"] .r { opacity: .4; }
         .mm-hdhint { margin-top: 8px; font-size: 12px; color: rgba(255,255,255,0.45); text-align: center; }
+        /* v36: la X scivola dentro la barra col titolo, la barra scende dall'alto */
+        @media (min-width: 900px) {
+            .mm-close.show { transition: opacity .25s ease .18s, transform .45s var(--bezier-pop) .18s, visibility 0s, background .2s, top .55s var(--spring) !important; }
+            body.mm-bar-on .mm-close.show { transform: scale(0.92); }
+            .mm-mbar.mm-al { transform: translate3d(0, -14px, 0); transition: opacity .3s ease, transform .55s var(--spring); }
+            .mm-mbar.mm-al.show { transform: none; }
+        }
         /* v34: avviso 1080p sotto al player (solo la prima volta) */
         .mm-hdtip { display: none; align-items: center; gap: 12px; margin-top: 10px; padding: 11px 12px; border-radius: 14px; background: #141417; box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.1); font-size: 13.5px; line-height: 1.4; color: rgba(255,255,255,0.8); }
         .mm-hdtip.show { display: flex; animation: mmUp .45s var(--bezier) both; }
@@ -4957,11 +4964,15 @@
             </div>
             <div class="wc-subsection-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Effetto 4K</div>
             <div class="settings-card mm-hdset">
-              <p style="font-size:0.78rem; color:var(--text-dim); margin:0 0 12px; line-height:1.45;">Rende i film più nitidi e definiti: contorni più netti, più dettaglio nei volti e nei paesaggi, più profondità e colori più vivi. Il film arriva dal player in 720p: l'effetto lo calcola l'app sopra il video.${window.mmHdLite ? ' Su iPhone e iPad Safari permette solo colori e contrasto, senza nitidezza.' : ''}</p>
+              <p style="font-size:0.78rem; color:var(--text-dim); margin:0 0 12px; line-height:1.45;">Rende i film più puliti e definiti: ammorbidisce i quadratini e la grana della compressione e rende netti solo i contorni veri (volti, occhi, oggetti), con più profondità e colori più vivi. Il film arriva dal player in 720p: l'effetto lo calcola l'app sopra il video.${window.mmHdLite ? ' Su iPhone e iPad di base solo colori e contrasto: sotto puoi provare l\'effetto completo.' : ''}</p>
               <div class="lib-chips" role="radiogroup" aria-label="Effetto 4K">
                 <button type="button" role="radio" data-v="0" onclick="mmSetHd(0)">Spento</button><button type="button" role="radio" data-v="1" onclick="mmSetHd(1)">Naturale</button><button type="button" role="radio" data-v="2" onclick="mmSetHd(2)">Forte</button><button type="button" role="radio" data-v="3" onclick="mmSetHd(3)">Massimo</button>
               </div>
               ${window.mmHdPreviewHTML ? mmHdPreviewHTML() : ''}
+              ${window.mmHdLite ? `<div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:14px;">
+                <p style="font-size:0.78rem; color:var(--text-dim); margin:0; line-height:1.4; flex:1;"><strong style="color:#fff;">Effetto completo su iPhone (prova)</strong><br>Se il film si blocca, scatta o diventa nero, spegnilo.</p>
+                <label class="switch" style="flex-shrink:0;"><input type="checkbox" id="mmHdFullToggle" ${window.mmHdFullOn && mmHdFullOn() ? 'checked' : ''} onchange="mmSetHdFull(this.checked)"><span class="slider"></span></label>
+              </div>` : ''}
             </div>
 
             <div class="wc-subsection-title"><i class="fa-solid fa-battery-half"></i> Riproduzione dei film</div>
@@ -5096,8 +5107,20 @@
         const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         const lite = ios || (/AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg|OPR|Firefox/.test(ua));
         window.mmHdLite = lite;
-        if (lite) document.documentElement.classList.add('mm-webkit');
-        else document.body.insertAdjacentHTML('beforeend', '<svg width="0" height="0" style="position:absolute;width:0;height:0" aria-hidden="true" focusable="false"><filter id="mmHD1" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="0.75" result="b1"/><feComposite in="SourceGraphic" in2="b1" operator="arithmetic" k1="0" k2="1.9" k3="-0.9" k4="0" result="s1"/><feGaussianBlur in="s1" stdDeviation="7" result="b2"/><feComposite in="s1" in2="b2" operator="arithmetic" k1="0" k2="1.3" k3="-0.3" k4="0" result="s2"/><feComponentTransfer in="s2" result="s3"><feFuncR type="table" tableValues="0 0.07 0.19 0.34 0.5 0.66 0.81 0.93 1"/><feFuncG type="table" tableValues="0 0.07 0.19 0.34 0.5 0.66 0.81 0.93 1"/><feFuncB type="table" tableValues="0 0.07 0.19 0.34 0.5 0.66 0.81 0.93 1"/></feComponentTransfer><feColorMatrix in="s3" type="saturate" values="1.12"/></filter><filter id="mmHD2" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="0.6" result="f0"/><feComposite in="SourceGraphic" in2="f0" operator="arithmetic" k1="0" k2="2.2" k3="-1.2" k4="0" result="f1"/><feGaussianBlur in="f1" stdDeviation="1.6" result="m0"/><feComposite in="f1" in2="m0" operator="arithmetic" k1="0" k2="1.55" k3="-0.55" k4="0" result="m1"/><feGaussianBlur in="m1" stdDeviation="9" result="c0"/><feComposite in="m1" in2="c0" operator="arithmetic" k1="0" k2="1.4" k3="-0.4" k4="0" result="c1"/><feComponentTransfer in="c1" result="t"><feFuncR type="table" tableValues="0 0.06 0.18 0.34 0.5 0.66 0.82 0.94 1"/><feFuncG type="table" tableValues="0 0.06 0.18 0.34 0.5 0.66 0.82 0.94 1"/><feFuncB type="table" tableValues="0 0.06 0.18 0.34 0.5 0.66 0.82 0.94 1"/></feComponentTransfer><feColorMatrix in="t" type="saturate" values="1.18"/></filter><filter id="mmHD3" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="0.6" result="f0"/><feComposite in="SourceGraphic" in2="f0" operator="arithmetic" k1="0" k2="2.7" k3="-1.7" k4="0" result="f1"/><feGaussianBlur in="f1" stdDeviation="1.8" result="m0"/><feComposite in="f1" in2="m0" operator="arithmetic" k1="0" k2="1.8" k3="-0.8" k4="0" result="m1"/><feGaussianBlur in="m1" stdDeviation="10" result="c0"/><feComposite in="m1" in2="c0" operator="arithmetic" k1="0" k2="1.5" k3="-0.5" k4="0" result="c1"/><feComponentTransfer in="c1" result="t"><feFuncR type="table" tableValues="0 0.05 0.17 0.34 0.5 0.66 0.83 0.95 1"/><feFuncG type="table" tableValues="0 0.05 0.17 0.34 0.5 0.66 0.83 0.95 1"/><feFuncB type="table" tableValues="0 0.05 0.17 0.34 0.5 0.66 0.83 0.95 1"/></feComponentTransfer><feColorMatrix in="t" type="saturate" values="1.22"/></filter></svg>');
+        // v36: filtro "pulito e nitido": prima ammorbidisce i quadratini e la grana della
+        // compressione, poi rinforza solo i contorni veri (le piccole variazioni non
+        // vengono accentuate), poi profondita' e colore. Su iPhone si puo' provare
+        // anche il filtro completo (interruttore nelle impostazioni)
+        let full = !lite;
+        try { if (lite && localStorage.getItem('mmHdFull') === '1') full = true; } catch (e) {}
+        document.documentElement.classList.toggle('mm-webkit', !full);
+        document.body.insertAdjacentHTML('beforeend', '<svg width="0" height="0" style="position:absolute;width:0;height:0" aria-hidden="true" focusable="false"><filter id="mmHD1" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="0.8" result="pre"/><feComposite in="SourceGraphic" in2="pre" operator="arithmetic" k1="0" k2="0.55" k3="0.45" k4="0" result="base"/><feGaussianBlur in="base" stdDeviation="1.4" result="bb"/><feComposite in="base" in2="bb" operator="arithmetic" k1="0" k2="1" k3="-1" k4="0.5" result="hp"/><feComponentTransfer in="hp" result="hpc"><feFuncR type="table" tableValues="0 0.1 0.32 0.5 0.5 0.5 0.68 0.9 1"/><feFuncG type="table" tableValues="0 0.1 0.32 0.5 0.5 0.5 0.68 0.9 1"/><feFuncB type="table" tableValues="0 0.1 0.32 0.5 0.5 0.5 0.68 0.9 1"/></feComponentTransfer><feComposite in="base" in2="hpc" operator="arithmetic" k1="0" k2="1" k3="1.6" k4="-0.8" result="sh"/><feGaussianBlur in="sh" stdDeviation="10" result="cb"/><feComposite in="sh" in2="cb" operator="arithmetic" k1="0" k2="1.2" k3="-0.2" k4="0" result="cl"/><feComponentTransfer in="cl" result="t"><feFuncR type="table" tableValues="0 0.08 0.21 0.36 0.52 0.68 0.82 0.93 1"/><feFuncG type="table" tableValues="0 0.08 0.21 0.36 0.52 0.68 0.82 0.93 1"/><feFuncB type="table" tableValues="0 0.08 0.21 0.36 0.52 0.68 0.82 0.93 1"/></feComponentTransfer><feColorMatrix in="t" type="saturate" values="1.1"/></filter><filter id="mmHD2" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="1.1" result="pre"/><feComposite in="SourceGraphic" in2="pre" operator="arithmetic" k1="0" k2="0.35" k3="0.65" k4="0" result="base"/><feGaussianBlur in="base" stdDeviation="1.8" result="bb"/><feComposite in="base" in2="bb" operator="arithmetic" k1="0" k2="1" k3="-1" k4="0.5" result="hp"/><feComponentTransfer in="hp" result="hpc"><feFuncR type="table" tableValues="0 0.06 0.28 0.49 0.5 0.51 0.72 0.94 1"/><feFuncG type="table" tableValues="0 0.06 0.28 0.49 0.5 0.51 0.72 0.94 1"/><feFuncB type="table" tableValues="0 0.06 0.28 0.49 0.5 0.51 0.72 0.94 1"/></feComponentTransfer><feComposite in="base" in2="hpc" operator="arithmetic" k1="0" k2="1" k3="2.6" k4="-1.3" result="sh"/><feGaussianBlur in="sh" stdDeviation="10" result="cb"/><feComposite in="sh" in2="cb" operator="arithmetic" k1="0" k2="1.28" k3="-0.28" k4="0" result="cl"/><feComponentTransfer in="cl" result="t"><feFuncR type="table" tableValues="0 0.08 0.21 0.36 0.52 0.68 0.82 0.93 1"/><feFuncG type="table" tableValues="0 0.08 0.21 0.36 0.52 0.68 0.82 0.93 1"/><feFuncB type="table" tableValues="0 0.08 0.21 0.36 0.52 0.68 0.82 0.93 1"/></feComponentTransfer><feColorMatrix in="t" type="saturate" values="1.14"/></filter><filter id="mmHD3" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="pre"/><feComposite in="SourceGraphic" in2="pre" operator="arithmetic" k1="0" k2="0.30" k3="0.7" k4="0" result="base"/><feGaussianBlur in="base" stdDeviation="1.6" result="bb"/><feComposite in="base" in2="bb" operator="arithmetic" k1="0" k2="1" k3="-1" k4="0.5" result="hp"/><feComponentTransfer in="hp" result="hpc"><feFuncR type="table" tableValues="0 0.05 0.27 0.49 0.5 0.51 0.73 0.95 1"/><feFuncG type="table" tableValues="0 0.05 0.27 0.49 0.5 0.51 0.73 0.95 1"/><feFuncB type="table" tableValues="0 0.05 0.27 0.49 0.5 0.51 0.73 0.95 1"/></feComponentTransfer><feComposite in="base" in2="hpc" operator="arithmetic" k1="0" k2="1" k3="3.4" k4="-1.7" result="sh"/><feGaussianBlur in="sh" stdDeviation="10" result="cb"/><feComposite in="sh" in2="cb" operator="arithmetic" k1="0" k2="1.34" k3="-0.34" k4="0" result="cl"/><feComponentTransfer in="cl" result="t"><feFuncR type="table" tableValues="0 0.08 0.21 0.36 0.52 0.68 0.82 0.93 1"/><feFuncG type="table" tableValues="0 0.08 0.21 0.36 0.52 0.68 0.82 0.93 1"/><feFuncB type="table" tableValues="0 0.08 0.21 0.36 0.52 0.68 0.82 0.93 1"/></feComponentTransfer><feColorMatrix in="t" type="saturate" values="1.18"/></filter></svg>');
+        window.mmHdFullOn = () => full;
+        window.mmSetHdFull = (on) => {
+            full = !lite || !!on;
+            try { if (on) localStorage.setItem('mmHdFull', '1'); else localStorage.removeItem('mmHdFull'); } catch (e) {}
+            document.documentElement.classList.toggle('mm-webkit', !full);
+        };
         let lvl = 2;
         try { const v = localStorage.getItem('mmHd'); if (v != null && /^[0-3]$/.test(v)) lvl = +v; } catch (e) {}
         const apply = () => {
@@ -5788,7 +5811,7 @@
         // scorrimento del PC), angoli dritti, e la X ci sta dentro, centrata
         const mmAlignChrome = () => {
             const xb = document.querySelector('body > .mm-close');
-            if (window.innerWidth < 900) { bar.style.left = bar.style.width = bar.style.transform = ''; if (xb) xb.style.right = ''; return; }
+            if (window.innerWidth < 900) { bar.style.left = bar.style.width = bar.style.transform = ''; bar.classList.remove('mm-al'); if (xb) xb.style.right = ''; return; }
             // misura senza l'animazione di apertura (che rimpicciolisce la scheda per un attimo)
             const mr = modal.getBoundingClientRect(), W = sheet.offsetWidth;
             if (!W) return;
@@ -5796,7 +5819,7 @@
             r.right = r.left + W;
             bar.style.left = Math.round(r.left) + 'px';
             bar.style.width = Math.round(r.width) + 'px';
-            bar.style.transform = 'none';
+            bar.classList.add('mm-al');
             if (xb) xb.style.setProperty('right', Math.round(window.innerWidth - r.right + 16) + 'px', 'important');
         };
         window.mmAlignChrome = mmAlignChrome;
@@ -6234,31 +6257,36 @@
         // solo, la velocita' resta quella vera e non sembra un secondo colpo. Dopo un
         // cambio c'e' una breve pausa (inerzia del touchpad); poi un nuovo colpo
         // passa subito se la spinta risale, se cambia verso o se il dito si era fermato
-        let hAcc = 0, hLocked = false, hAt = 0, hPrevT = 0, hVmin = 0, hVprev = 0, hDirL = 0, hPeak = 0, hDip = false;
+        // v36: UN movimento = UNA copertina. Dopo il cambio la copertina resta ferma
+        // finche' il gesto non e' davvero finito: dita sollevate (un attimo senza
+        // eventi, e il colpo dopo riparte piano), verso opposto, oppure inerzia ormai
+        // esaurita. Si conta solo la spinta degli ultimi 220 ms: la coda lenta
+        // dell'inerzia non si accumula mai in un altro cambio
+        let hLocked = false, hAt = 0, hPrevT = 0, hPrevA = 0, hDirL = 0, hRev = 0, hWin = [];
         heroEl.addEventListener('wheel', (e) => {
             if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
             e.preventDefault();
             const now = performance.now(), gap = hPrevT ? now - hPrevT : 1e9;
-            hPrevT = now;
             const dx = e.deltaMode === 1 ? e.deltaX * 16 : e.deltaX, a = Math.abs(dx), dir = dx > 0 ? 1 : -1;
-            const v = a * 16 / Math.min(Math.max(gap, 8), 250);
-            const since = now - hAt, prevV = hVprev;
-            hVprev = v;
+            const lastA = hPrevA;
+            hPrevT = now; hPrevA = a;
             if (hLocked) {
-                // dito fermo da un po': questo evento apre un gesto nuovo
-                if (gap > 400) { hLocked = false; hAcc = 0; }
+                const since = now - hAt;
+                if (dir !== hDirL) hRev += a; else hRev = 0;
+                if (gap > 600 || (gap > 130 && since > 250 && a <= Math.max(24, lastA * 2))) { hLocked = false; hWin = []; }
+                else if (hRev > 24 && since > 180) { hLocked = false; hWin = [[now, dir * hRev]]; hRev = 0; }
+                else if (since > 1300) { hLocked = false; hWin = []; }
+                else return;
             }
-            if (hLocked) {
-                // subito dopo il cambio (e finche' il dito accelera, senza essere mai calato) e' lo stesso gesto
-                if (dir === hDirL) { hPeak = Math.max(hPeak, v); if (v < hPeak * 0.6) hDip = true; }
-                if (since < 260 || (since < 600 && !hDip && v >= prevV && dir === hDirL)) { hVmin = v; return; }
-                const fresh = dir !== hDirL ? v > 4 : v > hVmin * 2 + 6;
-                if (!fresh) { hVmin = Math.min(hVmin, v); return; }
-                hLocked = false; hAcc = 0;
-            } else if (gap > 400) hAcc = 0;
-            if (hAcc && Math.sign(hAcc) !== dir) hAcc = 0;
-            hAcc += dx;
-            if (Math.abs(hAcc) > 30) { goHeroSlide(_heroIdx + dir, true); hLocked = true; hAt = now; hVmin = v; hDirL = dir; hPeak = v; hDip = false; hAcc = 0; }
+            hWin.push([now, dx]);
+            while (hWin.length && now - hWin[0][0] > 220) hWin.shift();
+            let sum = 0;
+            for (const w of hWin) sum += w[1];
+            if (Math.abs(sum) > 34) {
+                const d = sum > 0 ? 1 : -1;
+                goHeroSlide(_heroIdx + d, true);
+                hLocked = true; hAt = now; hDirL = d; hRev = 0; hWin = [];
+            }
         }, { passive: false });
 
         // ── v9: righe orizzontali: il touchpad non sposta piu' la pagina in verticale ──

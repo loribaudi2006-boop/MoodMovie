@@ -44,7 +44,7 @@
   const pad = document.getElementById('pad'), count = document.getElementById('count'), stats = document.getElementById('stats'), msg = document.getElementById('msg');
   let ev = [], slides = [], t0 = 0;
   // stessa logica delle copertine dell'app (v38)
-  let hLocked = false, hAt = 0, hPrevT = 0, hPrevA = 0, hDirL = 0, hRev = 0, hWin = [];
+  let hLocked = false, hAt = 0, hPrevT = 0, hPrevA = 0, hDirL = 0, hRev = 0, hWin = [], hGap = 16, hCand = 0, hCandA = 0;
   function onWheel(e) {
     if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) { record(e, 0); return; }
     e.preventDefault();
@@ -53,6 +53,13 @@
     const lastA = hPrevA;
     hPrevT = now; hPrevA = a;
     let slid = 0;
+    if (gap < 120) hGap = hGap * 0.85 + gap * 0.15;
+    if (hLocked && now - hAt > 250) {
+      const stop = Math.max(28, hGap * 2.5);
+      if (gap >= stop && gap < 600 && a <= Math.max(24, lastA * 2)) { hCand = 1; hCandA = a; }
+      else if (hCand && gap < stop && dir === hDirL && a > hCandA * 1.25 && a > 3) { hCand++; hCandA = a; if (hCand >= 3) { hLocked = false; hWin = []; hCand = 0; } }
+      else if (hCand && !(gap < stop && dir === hDirL && a >= hCandA)) hCand = 0;
+    }
     if (hLocked) {
       const since = now - hAt;
       if (dir !== hDirL) hRev += a; else hRev = 0;
@@ -64,7 +71,7 @@
       hWin.push([now, dx]);
       while (hWin.length && now - hWin[0][0] > 220) hWin.shift();
       let sum = 0; for (const w of hWin) sum += w[1];
-      if (Math.abs(sum) > 34) { slid = sum > 0 ? 1 : -1; hLocked = true; hAt = now; hDirL = slid; hRev = 0; hWin = []; slides.push(Math.round(now - t0)); count.textContent = slides.length; pad.classList.add('flash'); setTimeout(() => pad.classList.remove('flash'), 180); }
+      if (Math.abs(sum) > 34) { slid = sum > 0 ? 1 : -1; hLocked = true; hAt = now; hDirL = slid; hRev = 0; hWin = []; hCand = 0; slides.push(Math.round(now - t0)); count.textContent = slides.length; pad.classList.add('flash'); setTimeout(() => pad.classList.remove('flash'), 180); }
     }
     record(e, slid);
   }
@@ -77,7 +84,7 @@
   pad.addEventListener('wheel', onWheel, { passive: false });
   document.getElementById('reset').onclick = () => { ev = []; slides = []; t0 = 0; hLocked = false; hPrevT = 0; count.textContent = '0'; stats.textContent = ''; msg.textContent = ''; };
   document.getElementById('copy').onclick = async () => {
-    const data = 'MMTOUCHPAD ' + JSON.stringify({ v: 38, ua: navigator.userAgent, dpr: devicePixelRatio, w: innerWidth, slides, ev });
+    const data = 'MMTOUCHPAD ' + JSON.stringify({ v: 39, ua: navigator.userAgent, dpr: devicePixelRatio, w: innerWidth, slides, ev });
     try { await navigator.clipboard.writeText(data); msg.textContent = 'Copiato! Ora incollalo nella chat (' + ev.length + ' eventi).'; }
     catch (err) { const ta = document.createElement('textarea'); ta.value = data; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); msg.textContent = 'Copiato! Ora incollalo nella chat.'; }
   };

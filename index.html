@@ -277,6 +277,19 @@
         .rank-search-input::placeholder { color: rgba(255,255,255,0.42); }
         .rank-search-btn { width: 44px; height: 44px; flex-shrink: 0; border: 0; border-radius: 12px; background: #fff; color: #000; font-size: 15px; cursor: pointer; }
         .rank-results { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+        /* v39: "Aggiungi ai Visti" e risultati della Classifica: griglia che riempie lo spazio */
+        .rank-results, .aw-favs { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 12px; }
+        .rank-results:empty { display: none !important; }
+        @media (min-width: 600px) { .rank-results, .aw-favs { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); } }
+        .rank-results .rank-result-item, .aw-favs .rank-result-item { width: auto; min-width: 0; position: relative; }
+        .rank-results .rank-result-item img, .aw-favs .rank-result-item img { width: 100%; height: auto; border-radius: 10px; box-shadow: 0 10px 24px -14px rgba(0,0,0,0.9); }
+        .rank-result-item p { font-size: 12px; margin-top: 6px; }
+        .aw-done::after { content: '\f00c'; font: 900 12px 'Font Awesome 6 Free'; position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 50%; background: #e50914; color: #fff; display: grid; place-items: center; }
+        .aw-done img { opacity: .55; }
+        #addWatchedOverlay { animation: mmFade .25s ease both; }
+        #addWatchedOverlay .aw-sheet { animation: mmAwUp .45s cubic-bezier(.32,.72,0,1) both; max-height: 86vh !important; padding-bottom: calc(28px + var(--safe-b, 0px)) !important; }
+        @keyframes mmAwUp { from { transform: translateY(100%); } to { transform: none; } }
+        @media (min-width: 600px) { #addWatchedOverlay { align-items: center !important; justify-content: center; } #addWatchedOverlay .aw-sheet { width: min(720px, 92vw) !important; border-radius: 24px !important; border-bottom: 1px solid rgba(255,255,255,0.08) !important; } }
         .rank-result-item { width: 76px; cursor: pointer; }
         .rank-result-item img { width: 76px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 8px; display: block; transition: transform .35s var(--bezier-pop); }
         .rank-result-item:active img { transform: scale(0.93); }
@@ -1218,7 +1231,9 @@
         .mm-lg-lo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; }
         .mm-lg-hi { position: absolute; inset: 0; background-size: cover; background-repeat: no-repeat; will-change: opacity; }
         .mm-lg-shade { position: absolute; inset: 0; will-change: opacity; }
-        .mm-lg-in { position: absolute; inset: 0; transform-origin: 50% 18%; will-change: transform; }
+        .mm-lg-in { position: absolute; inset: 0; transform-origin: 50% 50%; will-change: transform; }
+        .modal-hero .mh-img { transform-origin: 50% 50%; }
+        .nav-link.mm-press i { transform: scale(0.84); }
         .mm-lg-top { position: fixed !important; margin: 0 !important; z-index: 3; will-change: transform, opacity; }
 
         /* in alto solo "Categorie": Film e Serie TV sono gia' nella barra */
@@ -1441,6 +1456,13 @@
         .lib-chips button:active { transform: scale(0.95); }
         .lib-chips button.on { background: #fff; color: #000; box-shadow: none; }
         .lib-meta { margin-top: 10px; font-size: 12.5px; color: rgba(255,255,255,0.45); }
+        .lib-sortbtn { display: none; flex: 0 0 auto; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border: 0; border-radius: 12px; background: rgba(255,255,255,0.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); color: #fff; font: 600 14px var(--sora, inherit); white-space: nowrap; cursor: pointer; transition: transform .3s var(--bezier-pop), background .2s; }
+        .lib-sortbtn:active { transform: scale(0.95); background: rgba(255,255,255,0.14); }
+        .lib-sortbtn i { font-size: 13px; color: rgba(255,255,255,0.6); }
+        .lib-sortbtn i.c { font-size: 10px; }
+        #libSortMenu .menu-item { padding: 13px 22px; }
+        #libSortMenu .menu-item > i:first-child { width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,0.08); display: grid; place-items: center; color: #fff; font-size: 15px; }
+        #libSortMenu .menu-item.selected > i:first-child { background: rgba(229,9,20,0.22); color: #ff6b73; }
         .lib-sortsel { display: none; position: relative; flex: 0 0 auto; }
         .lib-sortsel select { -webkit-appearance: none; appearance: none; height: 40px; max-width: 152px; padding: 0 28px 0 33px; border: 0; border-radius: 12px; background: rgba(255,255,255,0.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); color: #fff; font: 600 14px var(--sora, inherit); text-overflow: ellipsis; cursor: pointer; }
         .lib-sortsel select option { background: #111; color: #fff; }
@@ -1455,7 +1477,7 @@
             .lib-search input { padding: 0 38px 0 35px; }
             .lib-clear { right: 6px; width: 28px; height: 28px; font-size: 12px; }
             .lib-sortrow { display: none; }
-            .lib-sortsel { display: block; }
+            .lib-sortbtn { display: inline-flex; }
             .lib-meta { flex: 0 0 100%; margin: 0; font-size: 12px; }
             .lib-tools2:not(.has-q) .lib-meta { display: none; }
         }
@@ -1597,6 +1619,7 @@
     <div class="menu-item" onclick="showCategoryMenu(event)"><i class="fa-solid fa-list-ul"></i> Categoria <i class="fa-solid fa-chevron-right" style="margin-left:auto;font-size:0.7rem;"></i></div>
 </div>
 <div id="categoryMenu" class="search-menu" style="max-height: 320px; overflow-y: auto;"></div>
+<div id="libSortMenu" class="search-menu" data-title="Ordina"></div>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><filter id="mmNeonTube" x="-35%" y="-35%" width="170%" height="170%" color-interpolation-filters="sRGB"><feMorphology in="SourceAlpha" operator="dilate" radius="2.7" result="o1"/><feMorphology in="SourceAlpha" operator="erode" radius="2.7" result="i1"/><feComposite in="o1" in2="i1" operator="out" result="band"/><feGaussianBlur in="band" stdDeviation="0.7" result="bandS"/><feMorphology in="SourceAlpha" operator="dilate" radius="0.75" result="o2"/><feMorphology in="SourceAlpha" operator="erode" radius="0.75" result="i2"/><feComposite in="o2" in2="i2" operator="out" result="coreB"/><feGaussianBlur in="coreB" stdDeviation="0.45" result="coreS"/><feFlood flood-color="#d40a1b"/><feComposite in2="bandS" operator="in" result="tube"/><feFlood flood-color="#ffb8c0"/><feComposite in2="coreS" operator="in" result="core"/><feGaussianBlur in="tube" stdDeviation="3.2" result="g1"/><feGaussianBlur in="tube" stdDeviation="11" result="g2"/><feMerge><feMergeNode in="g2"/><feMergeNode in="g2"/><feMergeNode in="g1"/><feMergeNode in="tube"/><feMergeNode in="core"/></feMerge></filter><linearGradient id="mmT10f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff7482"/><stop offset=".45" stop-color="#ff2438"/><stop offset="1" stop-color="#7a0309"/></linearGradient><linearGradient id="mmT10g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff6a78"/><stop offset=".55" stop-color="#ff2438"/><stop offset="1" stop-color="#9e0812"/></linearGradient></defs></svg>
 <header>
@@ -1890,14 +1913,22 @@
         const it = typeof _heroItems !== 'undefined' ? _heroItems[idx] : null;
         const mode = typeof _heroMode !== 'undefined' ? _heroMode : 'movie';
         const c = navigator.connection;
-        const fast = !(c && (c.saveData || /(^|-)2g|3g/.test(c.effectiveType || '')));
+        // v39: qualita' massima anche con rete "3g" (solo risparmio dati / 2g la evitano)
+        const fast = !(c && (c.saveData || /(^|-)2g/.test(c.effectiveType || '')));
         const dpr = Math.min(window.devicePixelRatio || 1, 3);
+        // v39: un'immagine caricata vale anche se la decodifica anticipata fallisce
+        // (prima in quel caso la copertina restava alla versione leggera)
         const load = (u) => new Promise((res) => {
             const im = new Image();
             im.decoding = 'async';
-            if (idx === 0) im.fetchPriority = 'high';
+            if (idx === 0 || idx === _heroIdx) im.fetchPriority = 'high';
+            let done = false;
+            const fin = (ok) => { if (!done) { done = true; res(ok); } };
+            im.onload = () => { if (im.decode) im.decode().then(() => fin(true), () => fin(true)); else fin(true); };
+            im.onerror = () => fin(false);
             im.src = u;
-            if (im.decode) im.decode().then(() => res(true), () => res(false)); else { im.onload = () => res(true); im.onerror = () => res(false); }
+            (window.mmHeroKeep = window.mmHeroKeep || []).push(im);
+            if (window.mmHeroKeep.length > 14) window.mmHeroKeep.shift();
         });
         let shown = false;
         const show = (u) => {
@@ -1919,7 +1950,9 @@
             load(first).then(() => {
                 show(first);
                 // v35: qualita' massima subito (originale, anche 4K, su PC e telefono con rete veloce)
-                if (final !== first) load(final).then((ok) => { if (ok) show(final); });
+                // v39: se l'originale non arriva si riprova (prima restava la versione leggera)
+                const tryFinal = (k) => load(final).then((ok) => { if (ok) show(final); else if (k < 2) setTimeout(() => tryFinal(k + 1), 1500 * (k + 1)); });
+                if (final !== first) tryFinal(0);
             });
         };
         if (window.innerWidth < 600) {
@@ -4447,9 +4480,7 @@
         tools.innerHTML = '<label class="lib-search"><i class="fa-solid fa-magnifying-glass"></i><input id="' + o.id + '" type="search" inputmode="search" enterkeyhint="search" placeholder="' + (window.innerWidth < 600 ? 'Cerca' : o.placeholder) + '" autocomplete="off" spellcheck="false"><button type="button" class="lib-clear" aria-label="Cancella"><i class="fa-solid fa-xmark"></i></button></label>' +
             '<div class="lib-sortrow"><span class="lib-sortlbl" aria-label="Ordina"><i class="fa-solid fa-arrow-down-wide-short"></i><span class="t"> Ordina</span></span><div class="lib-chips" role="radiogroup">' +
             o.sorts.map(([v, l]) => '<button type="button" role="radio" data-v="' + v + '" class="' + (v === o.sort ? 'on' : '') + '" aria-checked="' + (v === o.sort) + '">' + l + '</button>').join('') +
-            '</div></div><label class="lib-sortsel"><i class="fa-solid fa-arrow-down-wide-short"></i><select aria-label="Ordina">' +
-            o.sorts.map(([v, l]) => '<option value="' + v + '"' + (v === o.sort ? ' selected' : '') + '>' + l + '</option>').join('') +
-            '</select><i class="fa-solid fa-chevron-down c"></i></label><div class="lib-meta" aria-live="polite"></div>';
+            '</div></div><button type="button" class="lib-sortbtn" aria-haspopup="true" aria-label="Ordina"><i class="fa-solid fa-arrow-down-wide-short"></i><span class="t"></span><i class="fa-solid fa-chevron-down c"></i></button><div class="lib-meta" aria-live="polite"></div>';
         const qi = tools.querySelector('input'), clr = tools.querySelector('.lib-clear');
         qi.value = o.q || '';
         tools.classList.toggle('has-q', !!qi.value);
@@ -4457,13 +4488,34 @@
         qi.addEventListener('input', () => { tools.classList.toggle('has-q', !!qi.value); clearTimeout(tq); tq = setTimeout(() => o.onQ(qi.value), 90); });
         qi.addEventListener('keydown', (e) => { if (e.key === 'Enter') qi.blur(); });
         clr.addEventListener('click', () => { qi.value = ''; tools.classList.remove('has-q'); o.onQ(''); qi.focus(); });
-        const sel = tools.querySelector('.lib-sortsel select');
-        sel.addEventListener('change', () => {
-            tools.querySelectorAll('.lib-chips button').forEach((x) => { const on = x.dataset.v === sel.value; x.classList.toggle('on', on); x.setAttribute('aria-checked', String(on)); });
-            o.onSort(sel.value);
+        // v39: telefono: l'ordine si sceglie da un pannello che sale dal basso, come gli altri menu
+        const sbtn = tools.querySelector('.lib-sortbtn');
+        let cur = o.sort;
+        const icons = { new: 'fa-clock-rotate-left', old: 'fa-hourglass-start', az: 'fa-arrow-down-a-z', recent: 'fa-clock-rotate-left', stars: 'fa-star' };
+        const setCur = (v) => {
+            cur = v;
+            const it = o.sorts.find((x) => x[0] === v) || o.sorts[0];
+            sbtn.querySelector('.t').textContent = it[1];
+            tools.querySelectorAll('.lib-chips button').forEach((x) => { const on = x.dataset.v === v; x.classList.toggle('on', on); x.setAttribute('aria-checked', String(on)); });
+        };
+        setCur(cur);
+        sbtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const m = document.getElementById('libSortMenu');
+            if (!m) return;
+            [...m.querySelectorAll('.menu-item')].forEach((x) => x.remove());
+            o.sorts.forEach(([v, l]) => {
+                const it = document.createElement('div');
+                it.className = 'menu-item' + (v === cur ? ' selected' : '');
+                it.innerHTML = '<i class="fa-solid ' + (icons[v] || 'fa-sort') + '"></i><div class="mi-txt"><b>' + l + '</b></div><i class="fa-solid fa-check mi-check"></i>';
+                it.addEventListener('click', (ev) => { ev.stopPropagation(); setCur(v); m.classList.remove('active'); o.onSort(v); });
+                m.appendChild(it);
+            });
+            m.classList.add('active');
         });
         tools.querySelectorAll('.lib-chips button').forEach((b) => b.addEventListener('click', () => {
-            sel.value = b.dataset.v;
+            cur = b.dataset.v;
+            sbtn.querySelector('.t').textContent = b.textContent;
             tools.querySelectorAll('.lib-chips button').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', String(x === b)); });
             o.onSort(b.dataset.v);
         }));
@@ -4669,11 +4721,21 @@
                 </div>
                 <div id="awResults" class="rank-results"></div>
                 <div style="font-size:0.8rem;font-weight:700;color:var(--text-dim);margin-bottom:10px;">Dai tuoi preferiti:</div>
-                <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <div class="aw-favs">
                   ${favorites.map(f => `<div class="rank-result-item" onclick="addToWatched(${f.id},'${(f.title||'').replace(/'/g,"\\'")}','${f.poster_path}','${f.type}')"><img src="https://image.tmdb.org/t/p/w185${f.poster_path}"><p>${f.title||''}</p></div>`).join('')}
                 </div>
               </div>`;
             overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+            overlay.firstElementChild.classList.add('aw-sheet');
+            // v39: chi e' gia' tra i visti ha la spunta; nomi sicuri nel testo
+            overlay.querySelectorAll('.aw-favs .rank-result-item').forEach((it, i) => {
+                const fv = favorites[i];
+                if (!fv) return;
+                if (watchedMovies.some((w) => w.id === fv.id)) it.classList.add('aw-done');
+                const p = it.querySelector('p');
+                if (p) p.textContent = fv.title || '';
+            });
+            if (!favorites.length) { const t = overlay.querySelector('.aw-favs'); if (t && t.previousElementSibling) t.previousElementSibling.style.display = 'none'; }
             document.body.appendChild(overlay);
         } else { overlay.style.display = 'flex'; }
         document.getElementById('awSearchInput').addEventListener('keypress', e => { if (e.key==='Enter') searchAddWatched(); });
@@ -5090,6 +5152,46 @@
     try { localStorage.removeItem('mmEnh'); localStorage.removeItem('mmHdTip'); } catch (e) {}
     // v38: tolto l'effetto 4K (e le sue impostazioni salvate)
     try { localStorage.removeItem('mmHd'); localStorage.removeItem('mmHdFull'); } catch (e) {}
+
+    document.addEventListener('click', (e) => {
+        const m = document.getElementById('libSortMenu');
+        if (m && m.classList.contains('active') && !(e.target.closest && e.target.closest('#libSortMenu, .lib-sortbtn'))) m.classList.remove('active');
+    });
+    // v39: Film / Serie TV / Libreria rispondono subito: la scheda si accende al tocco e
+    // il caricamento parte un attimo dopo (cosi' il tocco si vede sempre). Toccare la
+    // scheda in cui sei gia' riporta solo in cima, senza ricaricare tutto
+    (function mmNavFast() {
+        const nav = document.querySelector('.nav');
+        if (!nav) return;
+        let busyUntil = 0;
+        const homeOf = (mode) => typeof currentView !== 'undefined' && currentView === 'home' && currentMode === mode && !searchActive && !currentCategoryId && !currentSimilarId && !window.mmGenre
+            && !!document.querySelector('#movieGrid .home-section') && !document.body.classList.contains('mm-search-open');
+        const press = (el) => {
+            nav.querySelectorAll('.nav-link').forEach((l) => l.classList.toggle('active', l === el));
+        };
+        nav.addEventListener('pointerdown', (e) => {
+            const el = e.target.closest && e.target.closest('#homeBtn, #tvBtn, #favBtn');
+            if (el) el.classList.add('mm-press');
+        }, { passive: true });
+        ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => nav.addEventListener(t, () => nav.querySelectorAll('.mm-press').forEach((l) => l.classList.remove('mm-press')), { passive: true }));
+        nav.addEventListener('click', (e) => {
+            const el = e.target.closest && e.target.closest('#homeBtn, #tvBtn, #favBtn');
+            if (!el) return;
+            e.stopPropagation();
+            e.preventDefault();
+            const now = performance.now();
+            const mode = el.id === 'homeBtn' ? 'movie' : el.id === 'tvBtn' ? 'tv' : null;
+            const same = mode ? homeOf(mode) : (currentView === 'favs' && !document.body.classList.contains('mm-search-open'));
+            if (same) { press(el); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+            if (now < busyUntil && el.classList.contains('active')) return;
+            busyUntil = now + 350;
+            press(el);
+            let ran = false;
+            const go = () => { if (ran) return; ran = true; if (mode) window.switchMode(mode); else window.showFavs(); };
+            requestAnimationFrame(() => setTimeout(go, 0));
+            setTimeout(go, 70);
+        }, true);
+    })();
 
     // Traccia se l'utente ha interagito di recente (click/touch)
     let userInteracting = false;
@@ -5657,17 +5759,28 @@
             const s = o.rect.width / h.width;
             const dx = o.rect.left - h.left, dy = o.rect.top - h.top;
             if (flipAnim) flipAnim.cancel();
-            // la copertina intera (2:3) vola e diventa l'immagine della scheda
-            const ext = !o.hero ? Math.max(0, h.width * 1.5 - h.height) : 0;
-            mHero.style.borderRadius = (o.radius / s) + 'px';
-            // solo trasformazioni: fluida anche su iPhone
-            flipAnim = mHero.animate([
-                { transformOrigin: '0 0', transform: 'translate3d(' + dx + 'px,' + dy + 'px,0) scale(' + s + ')' },
-                { transformOrigin: '0 0', transform: 'none' }
-            ], { duration: 430, easing: 'cubic-bezier(.2,.85,.25,1)' });
-            setTimeout(() => { mHero.style.borderRadius = ''; }, 450);
+            (window.mmFlyKids || []).forEach((a) => a.cancel());
+            window.mmFlyKids = [];
+            // v39: la copertina (o la locandina) vola nella scheda con la SUA forma: larghezza
+            // e altezza giuste, angoli che si raddrizzano mentre vola, immagine mai deformata.
+            // Dalla copertina in cima l'immagine parte esattamente com'era inquadrata
+            const sx = o.rect.width / h.width, sy = o.rect.height / h.height;
+            const K0 = o.hero ? sy * (o.z || 1) : Math.max(sx, sy);
+            const ease = (t) => { const u = 1 - t; return 1 - u * u * u * (1 + 0.6 * t); };
+            const N = 16, outer = [], inner = [];
+            for (let q = 0; q <= N; q++) {
+                const p = ease(q / N), X = sx + (1 - sx) * p, Y = sy + (1 - sy) * p, K = K0 + (1 - K0) * p, rad = (o.radius || 0) * (1 - p);
+                outer.push({ transformOrigin: '0 0', transform: 'translate3d(' + (dx * (1 - p)).toFixed(2) + 'px,' + (dy * (1 - p)).toFixed(2) + 'px,0) scale(' + X.toFixed(5) + ',' + Y.toFixed(5) + ')', borderRadius: (rad / X).toFixed(2) + 'px / ' + (rad / Y).toFixed(2) + 'px' });
+                inner.push({ transform: 'scale(' + (K / X).toFixed(5) + ',' + (K / Y).toFixed(5) + ')' });
+            }
+            const D = o.hero ? 520 : 480;
+            flipAnim = mHero.animate(outer, { duration: D, easing: 'linear' });
+            mHero.querySelectorAll('.mh-img').forEach((k) => { window.mmFlyKids.push(k.animate(inner, { duration: D, easing: 'linear' })); });
+            // locandina: se l'immagine finale della scheda e' gia' pronta parte subito quella
+            const art = !o.hero && o.id && window.mmArt && window.mmArt[o.type + o.id];
+            if (art && art.hd) mmHeroLayers(art.hd, null, true, 'center');
             o.el.style.visibility = 'hidden';
-            o.landAt = Date.now() + 430;
+            o.landAt = Date.now() + D;
             preTimer = setTimeout(() => { if (modal.classList.contains('mm-pre') && !modal.classList.contains('open')) closeModal(); }, 9000);
         }
 
@@ -5682,7 +5795,10 @@
                 const cur = bg && /url\("?([^")]+)"?\)/.exec(bg.style.backgroundImage || '');
                 if (!isPhone() || !frame || !bg || !cur) { origin = null; return; }
                 const pos = bg.dataset.crop ? 'center' : 'center 15%';
-                o = { el: frame, rect: frame.getBoundingClientRect(), radius: 22, path: bg.dataset.art, low: cur[1], hi: cur[1], pos, hero: true };
+                const sl = hero.querySelector('.hero-slide.active');
+                let z = 1;
+                try { const mt = new DOMMatrixReadOnly(getComputedStyle(sl).transform); z = mt.a || 1; } catch (e) {}
+                o = { el: frame, rect: frame.getBoundingClientRect(), radius: 22, path: bg.dataset.art, low: cur[1], hi: cur[1], pos, hero: true, z };
             } else {
                 const card = ev.target.closest('.home-card, .movie-card');
                 if (!card || ev.target.closest('button')) return;
@@ -5690,7 +5806,7 @@
                 const p = img && pathOf(img.currentSrc || img.src);
                 if (!p) return;
                 if (!isPhone()) { origin = null; return; }
-                o = { el: card, rect: card.getBoundingClientRect(), radius: 10, path: p, low: img.currentSrc || img.src };
+                o = { el: card, rect: card.getBoundingClientRect(), radius: 10, path: p, low: img.currentSrc || img.src, id: card.dataset.id, type: card.dataset.mode || currentMode };
             }
             o.kind = 'card';
             o.at = Date.now();
@@ -5871,7 +5987,12 @@
                     inner.className = 'mm-lg-in';
                     [...fly.hero.childNodes].forEach((c) => inner.appendChild(c));
                     fly.hero.appendChild(inner);
-                    const sx = r.width / hr.width, sy = r.height / hr.height, k = Math.max(sx, sy);
+                    const sx = r.width / hr.width, sy = r.height / hr.height;
+                    // v39: alla fine l'immagine ha esattamente l'inquadratura della copertina
+                    // (stessa grandezza e stesso zoom): il passaggio finale non si vede
+                    let z = o.z || 1;
+                    try { const sl = document.querySelector('#heroBanner .hero-slide.active'); const mt = new DOMMatrixReadOnly(getComputedStyle(sl).transform); z = mt.a || z; } catch (e) {}
+                    const k = sy * z;
                     const dx = r.left - hr.left, dy = r.top - hr.top, R = o.radius || 22;
                     const ease = (t) => 1 - Math.pow(1 - t, 3.2);
                     const N = 14, outer = [], inn = [];
@@ -6195,7 +6316,7 @@
         // eventi, e il colpo dopo riparte piano), verso opposto, oppure inerzia ormai
         // esaurita. Si conta solo la spinta degli ultimi 220 ms: la coda lenta
         // dell'inerzia non si accumula mai in un altro cambio
-        let hLocked = false, hAt = 0, hPrevT = 0, hPrevA = 0, hDirL = 0, hRev = 0, hWin = [];
+        let hLocked = false, hAt = 0, hPrevT = 0, hPrevA = 0, hDirL = 0, hRev = 0, hWin = [], hGap = 16, hCand = 0, hCandA = 0;
         heroEl.addEventListener('wheel', (e) => {
             if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
             e.preventDefault();
@@ -6203,6 +6324,16 @@
             const dx = e.deltaMode === 1 ? e.deltaX * 16 : e.deltaX, a = Math.abs(dx), dir = dx > 0 ? 1 : -1;
             const lastA = hPrevA;
             hPrevT = now; hPrevA = a;
+            // ritmo normale degli eventi su questo PC (piu' lento se il PC e' sotto sforzo)
+            if (gap < 120) hGap = hGap * 0.85 + gap * 0.15;
+            if (hLocked && now - hAt > 250) {
+                // v39: le dita fermano l'inerzia (breve pausa) e spingono di nuovo: la spinta
+                // ricomincia piano e cresce per due eventi di fila = nuovo gesto, subito
+                const stop = Math.max(28, hGap * 2.5);
+                if (gap >= stop && gap < 600 && a <= Math.max(24, lastA * 2)) { hCand = 1; hCandA = a; }
+                else if (hCand && gap < stop && dir === hDirL && a > hCandA * 1.25 && a > 3) { hCand++; hCandA = a; if (hCand >= 3) { hLocked = false; hWin = []; hCand = 0; } }
+                else if (hCand && !(gap < stop && dir === hDirL && a >= hCandA)) hCand = 0;
+            }
             if (hLocked) {
                 const since = now - hAt;
                 if (dir !== hDirL) hRev += a; else hRev = 0;
@@ -6218,7 +6349,7 @@
             if (Math.abs(sum) > 34) {
                 const d = sum > 0 ? 1 : -1;
                 goHeroSlide(_heroIdx + d, true);
-                hLocked = true; hAt = now; hDirL = d; hRev = 0; hWin = [];
+                hLocked = true; hAt = now; hDirL = d; hRev = 0; hWin = []; hCand = 0;
             }
         }, { passive: false });
 
@@ -6459,7 +6590,8 @@
                 const r = mmSheetHeroRect();
                 const hd = mmImg(p, 'backdrop', r.height * 16 / 9, r.height);
                 const quick = 'https://image.tmdb.org/t/p/w780' + p;
-                if (quick !== hd) { mmHeroLayers(quick, null, true, 'center'); window.mmArtReady.then(() => { if (modal.classList.contains('mm-pre') || modal.classList.contains('open')) mmHeroLayers(hd, null, true, 'center'); }); }
+                const probe = new Image(); probe.src = hd;
+                if (quick !== hd && !(probe.complete && probe.naturalWidth)) { mmHeroLayers(quick, null, true, 'center'); window.mmArtReady.then(() => { if (modal.classList.contains('mm-pre') || modal.classList.contains('open')) mmHeroLayers(hd, null, true, 'center'); }); }
                 else mmHeroLayers(hd, null, true, 'center');
                 mmTint(p, (t) => {
                     if (!modal.classList.contains('mm-pre')) return;
@@ -6750,7 +6882,7 @@
                     const r = mmSheetHeroRect();
                     // la stessa immagine che la scheda mostrera'
                     const tl = mmPickTextless(data.images && data.images.backdrops) || data.backdrop_path;
-                    if (tl) { pre(mmImg(tl, 'backdrop', r.height * 16 / 9, r.height)); mmTint(tl, () => {}); }
+                    if (tl) { const hd = mmImg(tl, 'backdrop', r.height * 16 / 9, r.height); pre(hd); mmTint(tl, () => {}); (window.mmArt = window.mmArt || {})[type + id] = { p: tl, hd }; }
                     else if (data.poster_path) pre(mmImg(data.poster_path, 'poster', r.width, r.height));
                     if (data.poster_path) pre('https://image.tmdb.org/t/p/w342' + data.poster_path);
                     pre(mmPickLogo(data.images && data.images.logos));

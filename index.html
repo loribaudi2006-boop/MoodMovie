@@ -1232,6 +1232,9 @@
         .mm-lg-hi { position: absolute; inset: 0; background-size: cover; background-repeat: no-repeat; will-change: opacity; }
         .mm-lg-shade { position: absolute; inset: 0; will-change: opacity; }
         .mm-lg-in { position: absolute; inset: 0; transform-origin: 50% 50%; will-change: transform; }
+        /* v40: in volo l'immagine e' intera (larga), la cornice la ritaglia: niente bordi neri */
+        .mm-lg-in.mm-wide > .mm-lg-lo, .mm-lg-in.mm-wide > .mm-lg-hi { left: -100% !important; right: auto !important; width: 300% !important; height: 100% !important; object-fit: contain !important; object-position: center !important; background-size: contain !important; background-position: center !important; }
+        .modal-hero.mm-flywide img.mh-lo, .modal-hero.mm-flywide .mh-hi { left: -100% !important; right: auto !important; width: 300% !important; top: 0 !important; bottom: auto !important; height: 100% !important; object-fit: contain !important; object-position: center !important; background-size: contain !important; background-position: center !important; }
         .modal-hero .mh-img { transform-origin: 50% 50%; }
         .nav-link.mm-press i { transform: scale(0.84); }
         .mm-lg-top { position: fixed !important; margin: 0 !important; z-index: 3; will-change: transform, opacity; }
@@ -1902,14 +1905,14 @@
         im.src = 'https://image.tmdb.org/t/p/w300' + path;
     };
     // Banner: le immagini HD si caricano solo per il titolo visibile e il prossimo
-    window.mmPrimeSlide = function (i) {
+    window.mmPrimeSlide = function (i, light) {
         const bgs = document.querySelectorAll('#heroBanner .hero-banner-bg');
         const n = bgs.length;
         if (!n) return;
         const idx = ((i % n) + n) % n;
         const bg = bgs[idx];
-        if (!bg || bg.dataset.primed) return;
-        bg.dataset.primed = '1';
+        if (!bg || bg.dataset.primed === 'full' || (light && bg.dataset.primed)) return;
+        bg.dataset.primed = light ? 'light' : 'full';
         const it = typeof _heroItems !== 'undefined' ? _heroItems[idx] : null;
         const mode = typeof _heroMode !== 'undefined' ? _heroMode : 'movie';
         const c = navigator.connection;
@@ -1924,11 +1927,13 @@
             if (idx === 0 || idx === _heroIdx) im.fetchPriority = 'high';
             let done = false;
             const fin = (ok) => { if (!done) { done = true; res(ok); } };
-            im.onload = () => { if (im.decode) im.decode().then(() => fin(true), () => fin(true)); else fin(true); };
-            im.onerror = () => fin(false);
+            const keepL = (window.mmHeroKeep = window.mmHeroKeep || []);
+            const drop = () => { const k = keepL.indexOf(im); if (k >= 0) keepL.splice(k, 1); };
+            im.onload = () => { if (im.decode) im.decode().then(() => { drop(); fin(true); }, () => { drop(); fin(true); }); else { drop(); fin(true); } };
+            im.onerror = () => { drop(); fin(false); };
             im.src = u;
-            (window.mmHeroKeep = window.mmHeroKeep || []).push(im);
-            if (window.mmHeroKeep.length > 14) window.mmHeroKeep.shift();
+            keepL.push(im);
+            if (keepL.length > 8) keepL.shift();
         });
         let shown = false;
         const show = (u) => {
@@ -1947,8 +1952,10 @@
             const small = window.innerWidth < 600;
             const first = base + (small || need <= 820 ? 'w780' : 'w1280') + p;
             const final = need > 1340 && fast ? base + 'original' + p : (small && need > 820 ? base + 'w1280' + p : first);
+            bg.dataset.lowu = first;
             load(first).then(() => {
                 show(first);
+                if (light) return;
                 // v35: qualita' massima subito (originale, anche 4K, su PC e telefono con rete veloce)
                 // v39: se l'originale non arriva si riprova (prima restava la versione leggera)
                 const tryFinal = (k) => load(final).then((ok) => { if (ok) show(final); else if (k < 2) setTimeout(() => tryFinal(k + 1), 1500 * (k + 1)); });
@@ -2179,6 +2186,18 @@
             if (_heroMode === mode) renderHeroContent(false);
         } catch (e) { /* the meta line just shows year and rating */ }
     }
+    // v40: solo la copertina sullo schermo e le due vicine restano alla qualita' massima;
+    // le altre tornano alla versione leggera (gia' in memoria) appena hanno finito di sfumare
+    function mmHeroLighten() {
+        const slides = document.querySelectorAll('#heroBanner .hero-slide'), nn = slides.length;
+        if (nn < 5) return;
+        slides.forEach((sl, k) => {
+            const dist = Math.min((k - _heroIdx + nn) % nn, (_heroIdx - k + nn) % nn);
+            if (dist < 2 || sl.classList.contains('leaving') || sl.classList.contains('active') || k === ((_heroIdx + 2) % nn)) return;
+            const b = sl.querySelector('.hero-banner-bg');
+            if (b && b.dataset.lowu && /\/original\//.test(b.style.backgroundImage || '')) { b.style.backgroundImage = 'url(' + b.dataset.lowu + ')'; b.dataset.primed = 'light'; }
+        });
+    }
     function goHeroSlide(i, byUser) {
         const n = _heroItems.length;
         if (n < 2) return;
@@ -2189,10 +2208,13 @@
         const slides = document.querySelectorAll('#heroBanner .hero-slide');
         const out = slides[_heroIdx];
         // v32: la copertina che esce continua il suo zoom mentre sfuma (niente scatti)
-        if (out) { out.classList.add('leaving'); out.classList.remove('active'); setTimeout(() => { out.classList.remove('leaving'); if (!out.classList.contains('active')) out.classList.remove('mm-zin', 'mm-z0'); }, 1200); }
+        if (out) { out.classList.add('leaving'); out.classList.remove('active'); setTimeout(() => { out.classList.remove('leaving'); if (!out.classList.contains('active')) out.classList.remove('mm-zin', 'mm-z0'); mmHeroLighten(); }, 1200); }
         _heroIdx = i;
         _heroElapsed = 0;
-        mmPrimeSlide(i); mmPrimeSlide(i + 1); mmPrimeSlide(i - 1); mmPrimeSlide(i + 2);
+        mmPrimeSlide(i); mmPrimeSlide(i + 1); mmPrimeSlide(i - 1); mmPrimeSlide(i + 2, true);
+        // v40: le copertine lontane tornano alla versione leggera (gia' in memoria): meno
+        // memoria occupata, lo scorrimento resta veloce anche dopo tanti cambi
+        mmHeroLighten();
         const inc = slides[_heroIdx];
         if (inc) { inc.classList.remove('mm-zin', 'mm-z0', 'leaving'); void inc.offsetWidth; inc.classList.add('active', 'mm-zin'); }
         renderHeroContent(true);
@@ -5774,6 +5796,11 @@
                 inner.push({ transform: 'scale(' + (K / X).toFixed(5) + ',' + (K / Y).toFixed(5) + ')' });
             }
             const D = o.hero ? 520 : 480;
+            // v40: dalla copertina vola l'immagine intera (non solo la parte che la scheda
+            // mostra), cosi' all'inizio riempie tutta la cornice
+            mHero.classList.toggle('mm-flywide', !!o.hero);
+            clearTimeout(window._mmFlyWideT);
+            if (o.hero) window._mmFlyWideT = setTimeout(() => mHero.classList.remove('mm-flywide'), D + 30);
             flipAnim = mHero.animate(outer, { duration: D, easing: 'linear' });
             mHero.querySelectorAll('.mh-img').forEach((k) => { window.mmFlyKids.push(k.animate(inner, { duration: D, easing: 'linear' })); });
             // locandina: se l'immagine finale della scheda e' gia' pronta parte subito quella
@@ -5984,7 +6011,7 @@
                     document.body.appendChild(fly.lg);
                     const r = o.el.getBoundingClientRect(), hr = fly.hr;
                     const inner = document.createElement('div');
-                    inner.className = 'mm-lg-in';
+                    inner.className = 'mm-lg-in mm-wide';
                     [...fly.hero.childNodes].forEach((c) => inner.appendChild(c));
                     fly.hero.appendChild(inner);
                     const sx = r.width / hr.width, sy = r.height / hr.height;
@@ -6863,9 +6890,10 @@
                 const im = new Image();
                 im.decoding = 'async';
                 im.src = u;
-                if (im.decode) im.decode().catch(() => {});
+                const drop = () => { const k = keep.indexOf(im); if (k >= 0) keep.splice(k, 1); };
+                im.onload = im.onerror = () => { if (im.decode) im.decode().then(drop, drop); else drop(); };
                 keep.push(im);
-                if (keep.length > 60) keep.splice(0, keep.length - 60);
+                if (keep.length > 16) keep.splice(0, keep.length - 16);
             };
             const okNet = () => { const c = navigator.connection; return navigator.onLine !== false && !(c && (c.saveData || /(^|-)2g/.test(c.effectiveType || ''))); };
             const done = new Set();

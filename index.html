@@ -223,7 +223,9 @@
         .home-card-del { left: 6px; }
         .fav-btn.active i, .home-card-fav.active i { color: var(--primary-2); animation: heartPop .45s var(--bezier-pop); }
         .fav-btn:active, .home-card-fav:active, .home-card-del:active { transform: scale(0.84); }
-        img.img-shimmer { background: linear-gradient(100deg, #121215 40%, #1d1d22 50%, #121215 60%); background-size: 300% 100%; animation: shimmer 1.4s linear infinite; }
+        img.img-shimmer { background: linear-gradient(100deg, #121215 40%, #1d1d22 50%, #121215 60%); background-size: 300% 100%; background-position: 100% 0; }
+        /* v44: lo scintillio gira solo sulle copertine in caricamento che si vedono */
+        img.img-shimmer.mm-shon { animation: shimmer 1.4s linear infinite; }
         img.img-shimmer.loaded { animation: none; background: none; }
         @keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
         .load-more-btn { display: none; width: fit-content; margin: 22px auto 8px; padding: 14px 28px; border: 0; border-radius: 99px; background: rgba(255,255,255,0.1); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; transition: transform .35s var(--bezier-pop), background .2s; }
@@ -1232,14 +1234,11 @@
         .mm-lg-hi { position: absolute; inset: 0; background-size: cover; background-repeat: no-repeat; will-change: opacity; }
         .mm-lg-shade { position: absolute; inset: 0; will-change: opacity; }
         .mm-lg-in { position: absolute; inset: 0; transform-origin: 50% 50%; will-change: transform; }
-        .mm-audiotip { display: none; flex-direction: column; gap: 10px; margin-top: 10px; padding: 12px; border-radius: 14px; background: #141417; box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.1); font-size: 13.5px; line-height: 1.4; color: rgba(255,255,255,0.8); }
+        .mm-audiotip { display: none; flex-direction: column; gap: 10px; cursor: pointer; margin-top: 10px; padding: 12px; border-radius: 14px; background: #141417; box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.1); font-size: 13.5px; line-height: 1.4; color: rgba(255,255,255,0.8); }
         .mm-audiotip.show { display: flex; animation: mmUp .45s var(--bezier) both; }
         .mm-audiotip .t { display: flex; gap: 10px; align-items: flex-start; }
         .mm-audiotip .t > i { font-size: 18px; color: #ff6b73; margin-top: 1px; }
         .mm-audiotip b { color: #fff; }
-        .mm-audiotip .b { display: flex; gap: 8px; }
-        .mm-audiotip button { border: 0; border-radius: 99px; padding: 9px 14px; background: rgba(255,255,255,0.12); color: #fff; font: 700 12.5px var(--sora, inherit); cursor: pointer; }
-        .mm-audiotip button.alt { flex: 1; background: var(--red-grad, #e50914); }
         /* v41: copertine in cima da PC: scorrimento a scatti del browser (invisibile) */
         .hero-banner.mm-snap.show { display: flex; }
         .hero-banner.mm-snap { overflow-x: scroll; overflow-y: hidden; scroll-snap-type: none; overscroll-behavior-x: contain; scrollbar-width: none; touch-action: pan-x pan-y; }
@@ -5251,19 +5250,49 @@
         if (!ios || !wrap) { window.mmAudioTip = () => {}; return; }
         const tip = document.createElement('div');
         tip.className = 'mm-audiotip';
-        tip.innerHTML = '<div class="t"><i class="fa-solid fa-language"></i><span>L\'iPhone sceglie l\'audio in italiano. Per l\'inglese: nel player tocca <b><i class="fa-solid fa-gear"></i></b> → <b>Audio</b> → <b>English</b>.</span></div>' +
-            '<div class="b"><button type="button" class="alt"><i class="fa-solid fa-globe"></i> Inglese garantito (altro player)</button><button type="button" class="ok">Ok</button></div>';
+        // v44: solo l'avviso (si chiude toccandolo o da solo dopo 25 s)
+        tip.innerHTML = '<div class="t"><i class="fa-solid fa-language"></i><span>L\'iPhone sceglie l\'audio in italiano. Per l\'inglese: nel player tocca <b><i class="fa-solid fa-gear"></i></b> → <b>Audio</b> → <b>English</b>.</span></div>';
         const hide = () => tip.classList.remove('show');
-        tip.querySelector('.ok').addEventListener('click', hide);
-        tip.querySelector('.alt').addEventListener('click', () => {
-            hide();
-            window._mmForceAlt = true;
-            try { document.getElementById('watchOriginalBtn').onclick(); } finally { window._mmForceAlt = false; }
-        });
+        tip.addEventListener('click', hide);
         wrap.appendChild(tip);
         window.mmAudioTip = () => { tip.classList.add('show'); clearTimeout(tip._t); tip._t = setTimeout(hide, 25000); };
         const vp = document.getElementById('videoPlayer');
         if (vp) new MutationObserver(() => { if (!vp.querySelector('iframe')) hide(); }).observe(vp, { childList: true });
+    })();
+
+    // v44: scintillio delle copertine in caricamento solo mentre sono sullo schermo
+    (function mmShimmer() {
+        const on = (im, v) => { if (im.classList.contains('mm-shon') !== v) im.classList.toggle('mm-shon', v); };
+        if (!('IntersectionObserver' in window)) {
+            new MutationObserver(() => document.querySelectorAll('img.img-shimmer:not(.loaded):not(.mm-shon)').forEach((im) => on(im, true))).observe(document.body, { childList: true, subtree: true });
+            return;
+        }
+        const seen = new WeakSet();
+        const io = new IntersectionObserver((es) => es.forEach((e) => {
+            const im = e.target;
+            if (im.classList.contains('loaded') || !im.isConnected) { io.unobserve(im); on(im, false); return; }
+            on(im, e.isIntersecting);
+        }));
+        const done = (e) => {
+            const im = e.target;
+            if (!im || im.tagName !== 'IMG' || !seen.has(im)) return;
+            io.unobserve(im);
+            on(im, false);
+        };
+        document.addEventListener('load', done, true);
+        document.addEventListener('error', done, true);
+        let q = false;
+        const scan = () => {
+            q = false;
+            document.querySelectorAll('img.img-shimmer:not(.loaded)').forEach((im) => {
+                if (seen.has(im)) return;
+                seen.add(im);
+                if (im.complete && im.naturalWidth) return;
+                io.observe(im);
+            });
+        };
+        new MutationObserver(() => { if (!q) { q = true; requestAnimationFrame(scan); } }).observe(document.body, { childList: true, subtree: true });
+        scan();
     })();
 
     // v41: copertine in cima da PC: il gesto del touchpad lo legge il browser
@@ -5271,14 +5300,33 @@
         if (!(window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches)) return;
         const hero = document.getElementById('heroBanner');
         if (!hero || !('onscroll' in hero)) return;
-        let fired = false, fireDir = 0, fireAt = 0, settleT = null, resetting = false;
+        // v44: un gesto finisce SOLO quando lo dice il browser ("scrollend": dita sollevate e
+        // inerzia finita). Prima l'app lo decideva da una pausa di 90-140 ms: una piccola
+        // esitazione delle dita spezzava il gesto in due e cambiava due copertine.
+        // Mentre scorri, l'immagine segue un poco le dita (fino a 70 px, con "elastico")
+        const hasEnd = 'onscrollend' in window;
+        let fired = 0, peak = 0, endT = null, quiet = 0;
         const W = () => hero.clientWidth || window.innerWidth;
         const mid = () => Math.round(Math.max(0, hero.scrollWidth - hero.clientWidth) / 2);
+        const slidesEl = () => hero.querySelector('.hero-slides');
+        let shown = 0;
+        const follow = (px, smooth) => {
+            const ss = slidesEl();
+            if (!ss || (Math.abs(px - shown) < 0.5 && !smooth)) return;
+            shown = px;
+            ss.style.transition = smooth ? 'translate .5s cubic-bezier(.32,.72,0,1)' : 'none';
+            ss.style.translate = Math.abs(px) < 0.5 ? '0px 0px' : px.toFixed(1) + 'px 0px';
+        };
+        const rubber = (d) => { const L = 70; return -Math.sign(d) * L * (1 - Math.exp(-Math.abs(d) * 0.35 / L)); };
         const center = () => {
-            resetting = true;
+            quiet = performance.now() + 120;
             hero.scrollLeft = mid();
-            fired = false; fireDir = 0;
-            setTimeout(() => { resetting = false; }, 0);
+            fired = 0;
+        };
+        const endGesture = () => {
+            clearTimeout(endT);
+            if (!fired) follow(0, true);
+            if (Math.abs(hero.scrollLeft - mid()) > 1) center(); else fired = 0;
         };
         const ensure = () => {
             if (!hero.querySelector(':scope > .hero-frame')) return;
@@ -5289,31 +5337,41 @@
                 hero.classList.add('mm-snap');
             }
             if (!hero.querySelector(':scope > .mm-snapgap')) hero.insertAdjacentHTML('beforeend', '<div class="mm-snapgap" aria-hidden="true"></div><div class="mm-snapgap" aria-hidden="true"></div>');
+            shown = 0;
             if (Math.abs(hero.scrollLeft - mid()) > 1) center();
         };
-        const settle = () => { if (Math.abs(hero.scrollLeft - mid()) > 1) center(); else fired = false; };
         hero.addEventListener('scroll', () => {
-            if (resetting) return;
-            const x = hero.scrollLeft, d = x - mid(), th = Math.max(48, W() * 0.06);
-            if (!fired && Math.abs(d) > th) {
-                fired = true; fireDir = d > 0 ? 1 : -1; fireAt = x;
-                if (typeof goHeroSlide === 'function') goHeroSlide(_heroIdx + fireDir, true);
-            } else if (fired) {
-                // l'inerzia non torna mai indietro: una spinta nel verso opposto e' un gesto nuovo
-                if ((x - fireAt) * fireDir > 0) fireAt = x;
-                else if ((fireAt - x) * fireDir > th) {
-                    fireDir = -fireDir; fireAt = x;
-                    if (typeof goHeroSlide === 'function') goHeroSlide(_heroIdx + fireDir, true);
+            const x = hero.scrollLeft, d = x - mid();
+            if (performance.now() < quiet && Math.abs(d) < 2) return; // il ritorno al centro fatto dall'app
+            const th = Math.max(72, W() * 0.07);
+            if (!fired) {
+                if (Math.abs(d) > th) {
+                    fired = d > 0 ? 1 : -1; peak = x;
+                    follow(0, true);
+                    if (typeof goHeroSlide === 'function') goHeroSlide(_heroIdx + fired, true);
+                } else follow(rubber(d), false);
+            } else {
+                // nello stesso gesto: tornare indietro con decisione = copertina precedente
+                if ((x - peak) * fired > 0) peak = x;
+                else if ((peak - x) * fired > th * 1.6) {
+                    fired = -fired; peak = x;
+                    if (typeof goHeroSlide === 'function') goHeroSlide(_heroIdx + fired, true);
                 }
             }
-            clearTimeout(settleT);
-            settleT = setTimeout(settle, 90);
+            clearTimeout(endT);
+            // riserva: se il browser non segnala la fine del gesto
+            endT = setTimeout(endGesture, hasEnd ? 900 : 450);
         }, { passive: true });
-        hero.addEventListener('scrollend', () => { clearTimeout(settleT); settle(); });
-        new MutationObserver(ensure).observe(hero, { childList: true });
+        hero.addEventListener('scrollend', () => { if (performance.now() < quiet && Math.abs(hero.scrollLeft - mid()) < 2) return; endGesture(); });
+        // le dita ancora in movimento (anche a fine corsa, quando l'area non scorre piu') tengono vivo il gesto
+        hero.addEventListener('wheel', () => { if (endT) { clearTimeout(endT); endT = setTimeout(endGesture, hasEnd ? 900 : 450); } }, { passive: true });
+        // v44: preparato insieme al fotogramma (prima misurava la pagina mentre veniva costruita)
+        let eQ = false;
+        const ensureSoon = () => { if (!eQ) { eQ = true; requestAnimationFrame(() => { eQ = false; ensure(); }); } };
+        new MutationObserver(ensureSoon).observe(hero, { childList: true });
         new MutationObserver(() => { if (hero.classList.contains('show')) requestAnimationFrame(ensure); }).observe(hero, { attributes: true, attributeFilter: ['class'] });
         window.addEventListener('resize', () => { ensure(); if (hero.classList.contains('mm-snap')) center(); }, { passive: true });
-        ensure();
+        ensureSoon();
     })();
 
     // Traccia se l'utente ha interagito di recente (click/touch)
@@ -5534,7 +5592,7 @@
         };
         window.mmUpdateHeader = updateHeader;
         window.addEventListener('scroll', () => { if (!hTick) { hTick = true; requestAnimationFrame(updateHeader); } }, { passive: true });
-        new MutationObserver(updateHeader).observe(hero, { attributes: true, attributeFilter: ['class'] });
+        new MutationObserver(() => { if (!hTick) { hTick = true; requestAnimationFrame(updateHeader); } }).observe(hero, { attributes: true, attributeFilter: ['class'] });
         updateHeader();
 
         // Pulsanti Film / Serie TV in cima
@@ -6653,8 +6711,12 @@
         };
         const evenAll = () => { evenGrid(document.getElementById('homeVerticalGrid')); evenGrid(document.getElementById('movieGrid')); };
         let evQ = false;
-        const evenSoon = () => { if (!evQ) { evQ = true; requestAnimationFrame(() => { evQ = false; evenAll(); }); } };
-        new MutationObserver(evenSoon).observe(document.getElementById('movieGrid'), { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+        let evT = null;
+        const evenSoon = () => { clearTimeout(evT); evT = setTimeout(() => { if (!evQ) { evQ = true; requestAnimationFrame(() => { evQ = false; evenAll(); }); } }, 160); };
+        // v44: contano solo titoli aggiunti/tolti e i pulsanti "Carica altri" (non le copertine che finiscono di caricarsi)
+        const gridMut = (ms) => ms.some((m) => m.type === 'childList' || (m.target.classList && m.target.classList.contains('load-more-btn')));
+        window.mmGridMut = gridMut;
+        new MutationObserver((ms) => { if (gridMut(ms)) evenSoon(); }).observe(document.getElementById('movieGrid'), { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
         window.addEventListener('resize', evenSoon, { passive: true });
         // "Carica altri" di Popolari: si carica da solo arrivando in fondo
         if ('IntersectionObserver' in window) {
@@ -6776,7 +6838,7 @@
         // v32: controllo al massimo ogni 150 ms (non a ogni fotogramma dello scorrimento)
         const infSoon = () => { if (!infQ) { infQ = true; setTimeout(() => requestAnimationFrame(infCheck), 150); } };
         window.addEventListener('scroll', infSoon, { passive: true });
-        new MutationObserver(() => setTimeout(infSoon, 120)).observe(document.getElementById('movieGrid'), { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled', 'class'] });
+        new MutationObserver((ms) => { if (!window.mmGridMut || window.mmGridMut(ms)) setTimeout(infSoon, 120); }).observe(document.getElementById('movieGrid'), { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled', 'class'] });
 
         // ── v14: scheda in tre blocchi (informazioni, player, colonne) ──
         setTimeout(() => {
@@ -6935,9 +6997,16 @@
             imgs.forEach((i) => { if (i.loading === 'lazy') { i.loading = 'eager'; try { i.fetchPriority = 'high'; } catch (e) {} } });
             return imgs.every((i) => i.complete);
         };
-        const readyIv = setInterval(() => {
+        let readyQ = false;
+        const readyCheck = () => {
+            readyQ = false;
             if (window.__mmHomeReady) { clearInterval(readyIv); return; }
             if (homeReadyNow()) { clearInterval(readyIv); window.__mmHomeReady = true; window.dispatchEvent(new Event('mm-home-ready')); }
+        };
+        // v44: la verifica legge le posizioni delle copertine: si fa insieme al fotogramma
+        const readyIv = setInterval(() => {
+            if (document.hidden) { readyCheck(); return; }
+            if (!readyQ) { readyQ = true; requestAnimationFrame(readyCheck); }
         }, 70);
         setTimeout(() => clearInterval(readyIv), 15000);
 
@@ -7037,7 +7106,14 @@
             // copertine rimaste sullo schermo per un attimo: una alla volta (due in parallelo)
             const q = [];
             let busy = 0;
+            // v44: si comincia solo a home pronta (+2 s): nei primi secondi la rete e il
+            // processore servono alle copertine che si stanno vedendo
+            let goAt = Infinity, goT = null;
+            window.addEventListener('mm-home-ready', () => { if (goAt === Infinity) { goAt = performance.now() + 2000; pump(); } });
+            setTimeout(() => { if (goAt === Infinity) { goAt = 0; pump(); } }, 7000);
             const pump = () => {
+                const wait = goAt - performance.now();
+                if (wait > 0) { clearTimeout(goT); if (wait !== Infinity) goT = setTimeout(pump, wait + 20); return; }
                 while (busy < 2 && q.length) {
                     if (document.body.classList.contains('mm-modal-open') || !okNet() || done.size > 160) { setTimeout(pump, 900); return; }
                     const [id, type] = q.shift();

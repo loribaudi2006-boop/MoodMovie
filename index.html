@@ -1390,12 +1390,33 @@
         @keyframes mmLibR { from { opacity: 0; transform: translateX(22px); } to { opacity: 1; transform: none; } }
         @keyframes mmLibL { from { opacity: 0; transform: translateX(-22px); } to { opacity: 1; transform: none; } }
         /* v35: effetto 4K sul film (filtro della scheda video) */
-        #videoPlayer[data-hd="1"] iframe { filter: url(#mmHD1); }
-        #videoPlayer[data-hd="2"] iframe { filter: url(#mmHD2); }
-        #videoPlayer[data-hd="3"] iframe { filter: url(#mmHD3); }
-        .mm-webkit #videoPlayer[data-hd="1"] iframe { filter: contrast(1.06) saturate(1.12); }
-        .mm-webkit #videoPlayer[data-hd="2"] iframe { filter: contrast(1.12) saturate(1.2) brightness(1.02); }
-        .mm-webkit #videoPlayer[data-hd="3"] iframe { filter: contrast(1.18) saturate(1.28) brightness(1.03); }
+        /* v37: il filtro su un riquadro di un altro sito viene ignorato dal browser:
+           l'effetto e' un livello trasparente SOPRA il player che elabora quello che
+           ha sotto (i tocchi passano attraverso) */
+        .mm-hdlayer { position: absolute; inset: 0; z-index: 2; pointer-events: none; display: none; }
+        #videoPlayer[data-hd] .mm-hdlayer { display: block; }
+        #videoPlayer[data-hd="1"] .mm-hdlayer { -webkit-backdrop-filter: url(#mmHD1); backdrop-filter: url(#mmHD1); }
+        #videoPlayer[data-hd="2"] .mm-hdlayer { -webkit-backdrop-filter: url(#mmHD2); backdrop-filter: url(#mmHD2); }
+        #videoPlayer[data-hd="3"] .mm-hdlayer { -webkit-backdrop-filter: url(#mmHD3); backdrop-filter: url(#mmHD3); }
+        .mm-webkit #videoPlayer[data-hd="1"] .mm-hdlayer { -webkit-backdrop-filter: contrast(1.06) saturate(1.12); backdrop-filter: contrast(1.06) saturate(1.12); }
+        .mm-webkit #videoPlayer[data-hd="2"] .mm-hdlayer { -webkit-backdrop-filter: contrast(1.12) saturate(1.2) brightness(1.02); backdrop-filter: contrast(1.12) saturate(1.2) brightness(1.02); }
+        .mm-webkit #videoPlayer[data-hd="3"] .mm-hdlayer { -webkit-backdrop-filter: contrast(1.18) saturate(1.28) brightness(1.03); backdrop-filter: contrast(1.18) saturate(1.28) brightness(1.03); }
+        /* la modalita' leggera (telefoni/PC lenti) spegne le sfocature, non l'effetto 4K */
+        .mm-lite #videoPlayer[data-hd="1"] .mm-hdlayer { -webkit-backdrop-filter: url(#mmHD1) !important; backdrop-filter: url(#mmHD1) !important; }
+        .mm-lite #videoPlayer[data-hd="2"] .mm-hdlayer { -webkit-backdrop-filter: url(#mmHD2) !important; backdrop-filter: url(#mmHD2) !important; }
+        .mm-lite #videoPlayer[data-hd="3"] .mm-hdlayer { -webkit-backdrop-filter: url(#mmHD3) !important; backdrop-filter: url(#mmHD3) !important; }
+        .mm-lite.mm-webkit #videoPlayer[data-hd="1"] .mm-hdlayer { -webkit-backdrop-filter: contrast(1.06) saturate(1.12) !important; backdrop-filter: contrast(1.06) saturate(1.12) !important; }
+        .mm-lite.mm-webkit #videoPlayer[data-hd="2"] .mm-hdlayer { -webkit-backdrop-filter: contrast(1.12) saturate(1.2) brightness(1.02) !important; backdrop-filter: contrast(1.12) saturate(1.2) brightness(1.02) !important; }
+        .mm-lite.mm-webkit #videoPlayer[data-hd="3"] .mm-hdlayer { -webkit-backdrop-filter: contrast(1.18) saturate(1.28) brightness(1.03) !important; backdrop-filter: contrast(1.18) saturate(1.28) brightness(1.03) !important; }
+        /* schermo intero dell'app: il livello resta sopra al film */
+        #videoPlayer:fullscreen { aspect-ratio: auto; width: 100vw; height: 100vh; border-radius: 0; box-shadow: none; background: #000; }
+        #videoPlayer:-webkit-full-screen { aspect-ratio: auto; width: 100vw; height: 100vh; border-radius: 0; box-shadow: none; background: #000; }
+        .mm-fsbtn { display: none; align-items: center; gap: 9px; margin: 12px 10px 0 0; height: 44px; padding: 0 18px; border: 0; border-radius: 99px; background: rgba(255,255,255,0.12); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16); color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; transition: transform .3s var(--bezier-pop), background .25s; }
+        .mm-fsbtn:active { transform: scale(0.96); }
+        body.mm-playing .mm-fsbtn.ok { display: inline-flex; }
+        .mm-fsbtn .b { padding: 2px 7px; border-radius: 7px; background: var(--red-grad, #e50914); font: 800 10.5px var(--sora, inherit); letter-spacing: .4px; }
+        .mm-fsx { display: none; position: absolute; top: 14px; right: 14px; z-index: 5; width: 44px; height: 44px; border: 0; border-radius: 50%; background: rgba(0,0,0,0.5); color: #fff; font-size: 17px; cursor: pointer; }
+        #videoPlayer:fullscreen .mm-fsx, #videoPlayer:-webkit-full-screen .mm-fsx { display: grid; place-items: center; }
         .mm-hdset .lib-chips { overflow: visible; }
         .mm-hdset .lib-chips button { flex: 1 1 0; min-width: 0; padding: 0 6px; }
         .mm-hdprev { position: relative; margin-top: 14px; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: #000; touch-action: pan-y; cursor: ew-resize; -webkit-user-select: none; user-select: none; }
@@ -4964,7 +4985,7 @@
             </div>
             <div class="wc-subsection-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Effetto 4K</div>
             <div class="settings-card mm-hdset">
-              <p style="font-size:0.78rem; color:var(--text-dim); margin:0 0 12px; line-height:1.45;">Rende i film più puliti e definiti: ammorbidisce i quadratini e la grana della compressione e rende netti solo i contorni veri (volti, occhi, oggetti), con più profondità e colori più vivi. Il film arriva dal player in 720p: l'effetto lo calcola l'app sopra il video.${window.mmHdLite ? ' Su iPhone e iPad di base solo colori e contrasto: sotto puoi provare l\'effetto completo.' : ''}</p>
+              <p style="font-size:0.78rem; color:var(--text-dim); margin:0 0 12px; line-height:1.45;">Rende i film più puliti e definiti: ammorbidisce i quadratini e la grana della compressione e rende netti solo i contorni veri (volti, occhi, oggetti), con più profondità e colori più vivi. Il film arriva dal player in 720p: l'effetto lo calcola l'app sopra il video. A schermo intero usa il pulsante <strong style="color:#fff;">Schermo intero 4K</strong> sotto al player: lo schermo intero del player toglie l'effetto.${window.mmHdLite ? ' Su iPhone e iPad di base solo colori e contrasto: sotto puoi provare l\'effetto completo.' : ''}</p>
               <div class="lib-chips" role="radiogroup" aria-label="Effetto 4K">
                 <button type="button" role="radio" data-v="0" onclick="mmSetHd(0)">Spento</button><button type="button" role="radio" data-v="1" onclick="mmSetHd(1)">Naturale</button><button type="button" role="radio" data-v="2" onclick="mmSetHd(2)">Forte</button><button type="button" role="radio" data-v="3" onclick="mmSetHd(3)">Massimo</button>
               </div>
@@ -5155,6 +5176,37 @@
             });
         };
         apply();
+    })();
+
+    // v37: il livello dell'effetto si rimette sopra il player ogni volta che parte un film
+    (function mmHdLayer() {
+        const vp = document.getElementById('videoPlayer'), wrap = document.getElementById('videoPlayerWrap');
+        if (!vp || !wrap) return;
+        const ensure = () => {
+            if (!vp.querySelector('iframe')) return;
+            if (!vp.querySelector('.mm-hdlayer')) { const l = document.createElement('div'); l.className = 'mm-hdlayer'; l.setAttribute('aria-hidden', 'true'); vp.appendChild(l); }
+            if (!vp.querySelector('.mm-fsx')) {
+                const x = document.createElement('button');
+                x.type = 'button'; x.className = 'mm-fsx'; x.setAttribute('aria-label', 'Esci dallo schermo intero');
+                x.innerHTML = '<i class="fa-solid fa-compress"></i>';
+                x.addEventListener('click', () => { const ex = document.exitFullscreen || document.webkitExitFullscreen; if (ex) ex.call(document); });
+                vp.appendChild(x);
+            }
+        };
+        new MutationObserver(ensure).observe(vp, { childList: true });
+        ensure();
+        // schermo intero dell'app (quello del player copre il livello e l'effetto sparisce)
+        const can = !!(vp.requestFullscreen || vp.webkitRequestFullscreen) && (document.fullscreenEnabled || document.webkitFullscreenEnabled);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'mm-fsbtn' + (can ? ' ok' : '');
+        btn.innerHTML = '<i class="fa-solid fa-expand"></i> Schermo intero <span class="b">4K</span>';
+        btn.addEventListener('click', () => {
+            const go = vp.requestFullscreen || vp.webkitRequestFullscreen;
+            if (!go) return;
+            try { const p = go.call(vp, { navigationUI: 'hide' }); if (p && p.then) p.then(() => { try { screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {}); } catch (e) {} }).catch(() => {}); } catch (e) {}
+        });
+        wrap.appendChild(btn);
     })();
 
     if (typeof window.showProfile === 'function') {

@@ -1389,6 +1389,30 @@
         #libContent.mm-lib-l { animation: mmLibL .38s var(--bezier) both; }
         @keyframes mmLibR { from { opacity: 0; transform: translateX(22px); } to { opacity: 1; transform: none; } }
         @keyframes mmLibL { from { opacity: 0; transform: translateX(-22px); } to { opacity: 1; transform: none; } }
+        /* v35: effetto 4K sul film (filtro della scheda video) */
+        #videoPlayer[data-hd="1"] iframe { filter: url(#mmHD1); }
+        #videoPlayer[data-hd="2"] iframe { filter: url(#mmHD2); }
+        #videoPlayer[data-hd="3"] iframe { filter: url(#mmHD3); }
+        .mm-webkit #videoPlayer[data-hd="1"] iframe { filter: contrast(1.06) saturate(1.12); }
+        .mm-webkit #videoPlayer[data-hd="2"] iframe { filter: contrast(1.12) saturate(1.2) brightness(1.02); }
+        .mm-webkit #videoPlayer[data-hd="3"] iframe { filter: contrast(1.18) saturate(1.28) brightness(1.03); }
+        .mm-hdset .lib-chips { overflow: visible; }
+        .mm-hdset .lib-chips button { flex: 1 1 0; min-width: 0; padding: 0 6px; }
+        .mm-hdprev { position: relative; margin-top: 14px; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: #000; touch-action: pan-y; cursor: ew-resize; -webkit-user-select: none; user-select: none; }
+        .mm-hdprev img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+        .mm-hdprev img.f { clip-path: inset(0 0 0 var(--x, 50%)); }
+        .mm-hdprev[data-hd="1"] img.f { filter: url(#mmHD1); }
+        .mm-hdprev[data-hd="2"] img.f { filter: url(#mmHD2); }
+        .mm-hdprev[data-hd="3"] img.f { filter: url(#mmHD3); }
+        .mm-webkit .mm-hdprev[data-hd="1"] img.f { filter: contrast(1.06) saturate(1.12); }
+        .mm-webkit .mm-hdprev[data-hd="2"] img.f { filter: contrast(1.12) saturate(1.2) brightness(1.02); }
+        .mm-webkit .mm-hdprev[data-hd="3"] img.f { filter: contrast(1.18) saturate(1.28) brightness(1.03); }
+        .mm-hdprev .bar { position: absolute; top: 0; bottom: 0; left: var(--x, 50%); width: 2px; margin-left: -1px; background: #fff; box-shadow: 0 0 12px rgba(0,0,0,0.6); pointer-events: none; }
+        .mm-hdprev .bar::after { content: ''; position: absolute; top: 50%; left: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+        .mm-hdprev span { position: absolute; top: 8px; padding: 3px 8px; border-radius: 99px; background: rgba(0,0,0,0.6); font: 700 11px var(--sora, inherit); color: #fff; pointer-events: none; }
+        .mm-hdprev .l { left: 8px; } .mm-hdprev .r { right: 8px; }
+        .mm-hdprev[data-hd="0"] .r { opacity: .4; }
+        .mm-hdhint { margin-top: 8px; font-size: 12px; color: rgba(255,255,255,0.45); text-align: center; }
         /* v34: avviso 1080p sotto al player (solo la prima volta) */
         .mm-hdtip { display: none; align-items: center; gap: 12px; margin-top: 10px; padding: 11px 12px; border-radius: 14px; background: #141417; box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.1); font-size: 13.5px; line-height: 1.4; color: rgba(255,255,255,0.8); }
         .mm-hdtip.show { display: flex; animation: mmUp .45s var(--bezier) both; }
@@ -1890,9 +1914,10 @@
             const base = 'https://image.tmdb.org/t/p/';
             const small = window.innerWidth < 600;
             const first = base + (small || need <= 820 ? 'w780' : 'w1280') + p;
-            const final = need > 1340 && fast && !small ? base + 'original' + p : (small && need > 820 ? base + 'w1280' + p : first);
+            const final = need > 1340 && fast ? base + 'original' + p : (small && need > 820 ? base + 'w1280' + p : first);
             load(first).then(() => {
                 show(first);
+                // v35: qualita' massima subito (originale, anche 4K, su PC e telefono con rete veloce)
                 if (final !== first) load(final).then((ok) => { if (ok) show(final); });
             });
         };
@@ -3327,7 +3352,6 @@
             _vixsrcCtx.lastKnownTime = d.currentTime;
             _vixsrcCtx.lastKnownProgress = d.duration ? Math.min(0.99, d.currentTime / d.duration) : 0.05;
             if (_mmIntro) mmIntroTick();
-            if (d.event === 'play' && window.mmHideHdTip && d.currentTime > 600) mmHideHdTip();
         }
     });
 
@@ -3548,7 +3572,6 @@
             // Registra in Continua a guardare (incluse stagione/episodio per le serie TV)
             updateContinueWatching(id, title, data.poster_path || data.backdrop_path, type, cwEntry ? cwEntry.progress : 0.05, cwEntry ? cwEntry.resumeTime : 0, type === 'tv' ? selectedSeason : undefined, type === 'tv' ? selectedEpisode : undefined);
             _vixsrcCtx = { id, title, poster_path: data.poster_path || data.backdrop_path, mode: type, expectedStart: startTime, embedUrl, checked: false, retried: false };
-            if (window.mmShowHdTip) mmShowHdTip();
         };
 
         // Ricomincia - riparte da zero ignorando il minutaggio salvato
@@ -3572,7 +3595,6 @@
             // Resetta il minutaggio salvato in Continua a guardare (mantenendo stagione/episodio correnti)
             updateContinueWatching(id, title, data.poster_path || data.backdrop_path, type, 0.05, 0, type === 'tv' ? selectedSeason : undefined, type === 'tv' ? selectedEpisode : undefined);
             _vixsrcCtx = { id, title, poster_path: data.poster_path || data.backdrop_path, mode: type, embedUrl };
-            if (window.mmShowHdTip) mmShowHdTip();
             watchBtn.innerHTML = `<i class="fa-solid fa-play" style="margin-right:8px"></i> Guarda ora`;
             restartBtn.style.display = 'none';
         };
@@ -4933,10 +4955,15 @@
                 <span class="slider"></span>
               </label>
             </div>
-            <div class="wc-subsection-title"><i class="fa-solid fa-gear"></i> Qualità video</div>
-            <div class="settings-card">
-              <p style="font-size:0.78rem; color:var(--text-dim); margin:0; line-height:1.5;"><strong style="color:#fff;">Guardare in 1080p</strong><br>Il player di "Guarda ora" parte sempre in 720p e l'app non può cambiarlo da fuori. Quando il film parte tocca <i class="fa-solid fa-gear" style="color:#fff"></i> nel player, poi <strong style="color:#fff;">Qualità</strong> e scegli <strong style="color:#fff;">1080p</strong>. Va scelto a ogni film.</p>
+            <div class="wc-subsection-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Effetto 4K</div>
+            <div class="settings-card mm-hdset">
+              <p style="font-size:0.78rem; color:var(--text-dim); margin:0 0 12px; line-height:1.45;">Rende i film più nitidi e definiti: contorni più netti, più dettaglio nei volti e nei paesaggi, più profondità e colori più vivi. Il film arriva dal player in 720p: l'effetto lo calcola l'app sopra il video.${window.mmHdLite ? ' Su iPhone e iPad Safari permette solo colori e contrasto, senza nitidezza.' : ''}</p>
+              <div class="lib-chips" role="radiogroup" aria-label="Effetto 4K">
+                <button type="button" role="radio" data-v="0" onclick="mmSetHd(0)">Spento</button><button type="button" role="radio" data-v="1" onclick="mmSetHd(1)">Naturale</button><button type="button" role="radio" data-v="2" onclick="mmSetHd(2)">Forte</button><button type="button" role="radio" data-v="3" onclick="mmSetHd(3)">Massimo</button>
+              </div>
+              ${window.mmHdPreviewHTML ? mmHdPreviewHTML() : ''}
             </div>
+
             <div class="wc-subsection-title"><i class="fa-solid fa-battery-half"></i> Riproduzione dei film</div>
             <div class="settings-card">
               <p style="font-size:0.78rem; color:var(--text-dim); margin:0; line-height:1.4;">Se l'app richiede di premere il tasto "Play" per avviarsi oppure la funzione "Riprendi da" non funziona e i film non riprendono dal punto in cui erano stati interrotti, disattiva il risparmio energetico.</p>
@@ -5056,24 +5083,61 @@
         if (e.target === modal && window.innerWidth >= 900 && modal.classList.contains('open')) window.closeModal();
     });
 
-    // v34: il filtro "stile 4K" e' stato tolto (non si notava). Il player vixsrc parte
-    // sempre a 720p (lo imposta lui appena carica il film) e non accetta comandi
-    // dall'app: i 1080p si scelgono dall'ingranaggio del player. La prima volta
-    // che parte un film l'app lo spiega con un avviso sotto al player
-    (function mmHdTip() {
-        try { localStorage.removeItem('mmEnh'); } catch (e) {}
-        const wrap = document.getElementById('videoPlayerWrap');
-        if (!wrap) return;
-        const tip = document.createElement('div');
-        tip.className = 'mm-hdtip';
-        tip.innerHTML = '<span class="mm-hdtip-q">HD</span><span class="mm-hdtip-t">Il film parte in <b>720p</b>. Per vederlo in <b>1080p</b> tocca <i class="fa-solid fa-gear"></i> nel player, poi <b>Qualità</b> e scegli <b>1080p</b>.</span><button type="button" aria-label="Ho capito">Ok</button>';
-        wrap.appendChild(tip);
-        let seen = false;
-        try { seen = localStorage.getItem('mmHdTip') === '1'; } catch (e) {}
-        tip.querySelector('button').addEventListener('click', () => { tip.classList.remove('show'); try { localStorage.setItem('mmHdTip', '1'); } catch (e) {} });
-        window.mmShowHdTip = function () { if (!seen) tip.classList.add('show'); };
-        window.mmHideHdTip = function () { tip.classList.remove('show'); };
+    // v35: vixsrc manda al massimo 720p (le sue playlist hanno solo 480p e 720p, per
+    // tutti i titoli provati): nessun 1080p da scegliere, quindi niente avviso
+    try { localStorage.removeItem('mmEnh'); localStorage.removeItem('mmHdTip'); } catch (e) {}
+    // v35: "Effetto 4K". Il film arriva dal player in 720p e l'app non puo' leggerne i
+    // pixel (e' un riquadro di un altro sito), ma puo' farci passare sopra un filtro
+    // calcolato dalla scheda video: tre strati di dettaglio (contorni fini, trama,
+    // profondita'), curva di contrasto e colore. Su iPhone/iPad (Safari) il filtro di
+    // nitidezza sul video non e' affidabile: li' solo colori e contrasto
+    (function mmHd() {
+        const ua = navigator.userAgent || '';
+        const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const lite = ios || (/AppleWebKit/.test(ua) && !/Chrome|Chromium|Edg|OPR|Firefox/.test(ua));
+        window.mmHdLite = lite;
+        if (lite) document.documentElement.classList.add('mm-webkit');
+        else document.body.insertAdjacentHTML('beforeend', '<svg width="0" height="0" style="position:absolute;width:0;height:0" aria-hidden="true" focusable="false"><filter id="mmHD1" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="0.75" result="b1"/><feComposite in="SourceGraphic" in2="b1" operator="arithmetic" k1="0" k2="1.9" k3="-0.9" k4="0" result="s1"/><feGaussianBlur in="s1" stdDeviation="7" result="b2"/><feComposite in="s1" in2="b2" operator="arithmetic" k1="0" k2="1.3" k3="-0.3" k4="0" result="s2"/><feComponentTransfer in="s2" result="s3"><feFuncR type="table" tableValues="0 0.07 0.19 0.34 0.5 0.66 0.81 0.93 1"/><feFuncG type="table" tableValues="0 0.07 0.19 0.34 0.5 0.66 0.81 0.93 1"/><feFuncB type="table" tableValues="0 0.07 0.19 0.34 0.5 0.66 0.81 0.93 1"/></feComponentTransfer><feColorMatrix in="s3" type="saturate" values="1.12"/></filter><filter id="mmHD2" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="0.6" result="f0"/><feComposite in="SourceGraphic" in2="f0" operator="arithmetic" k1="0" k2="2.2" k3="-1.2" k4="0" result="f1"/><feGaussianBlur in="f1" stdDeviation="1.6" result="m0"/><feComposite in="f1" in2="m0" operator="arithmetic" k1="0" k2="1.55" k3="-0.55" k4="0" result="m1"/><feGaussianBlur in="m1" stdDeviation="9" result="c0"/><feComposite in="m1" in2="c0" operator="arithmetic" k1="0" k2="1.4" k3="-0.4" k4="0" result="c1"/><feComponentTransfer in="c1" result="t"><feFuncR type="table" tableValues="0 0.06 0.18 0.34 0.5 0.66 0.82 0.94 1"/><feFuncG type="table" tableValues="0 0.06 0.18 0.34 0.5 0.66 0.82 0.94 1"/><feFuncB type="table" tableValues="0 0.06 0.18 0.34 0.5 0.66 0.82 0.94 1"/></feComponentTransfer><feColorMatrix in="t" type="saturate" values="1.18"/></filter><filter id="mmHD3" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="0.6" result="f0"/><feComposite in="SourceGraphic" in2="f0" operator="arithmetic" k1="0" k2="2.7" k3="-1.7" k4="0" result="f1"/><feGaussianBlur in="f1" stdDeviation="1.8" result="m0"/><feComposite in="f1" in2="m0" operator="arithmetic" k1="0" k2="1.8" k3="-0.8" k4="0" result="m1"/><feGaussianBlur in="m1" stdDeviation="10" result="c0"/><feComposite in="m1" in2="c0" operator="arithmetic" k1="0" k2="1.5" k3="-0.5" k4="0" result="c1"/><feComponentTransfer in="c1" result="t"><feFuncR type="table" tableValues="0 0.05 0.17 0.34 0.5 0.66 0.83 0.95 1"/><feFuncG type="table" tableValues="0 0.05 0.17 0.34 0.5 0.66 0.83 0.95 1"/><feFuncB type="table" tableValues="0 0.05 0.17 0.34 0.5 0.66 0.83 0.95 1"/></feComponentTransfer><feColorMatrix in="t" type="saturate" values="1.22"/></filter></svg>');
+        let lvl = 2;
+        try { const v = localStorage.getItem('mmHd'); if (v != null && /^[0-3]$/.test(v)) lvl = +v; } catch (e) {}
+        const apply = () => {
+            const vp = document.getElementById('videoPlayer');
+            if (vp) { if (lvl) vp.dataset.hd = String(lvl); else delete vp.dataset.hd; }
+            document.querySelectorAll('.mm-hdprev').forEach((p) => { p.dataset.hd = String(lvl); });
+            document.querySelectorAll('.mm-hdset .lib-chips button').forEach((b) => { const on = +b.dataset.v === lvl; b.classList.toggle('on', on); b.setAttribute('aria-checked', String(on)); });
+        };
+        window.mmHdLevel = () => lvl;
+        window.mmSetHd = (v) => {
+            lvl = Math.max(0, Math.min(3, +v || 0));
+            try { localStorage.setItem('mmHd', String(lvl)); } catch (e) {}
+            apply();
+        };
+        // anteprima nelle impostazioni: stessa immagine, a sinistra com'e', a destra con l'effetto
+        window.mmHdPreviewHTML = () => {
+            const it = (typeof _heroItems !== 'undefined' && _heroItems[0]) || null;
+            const p = it && (it.backdrop_path || it.poster_path);
+            if (!p) return '';
+            const src = 'https://image.tmdb.org/t/p/w300' + p;
+            return '<div class="mm-hdprev" data-hd="' + lvl + '" style="--x:50%"><img alt="" src="' + src + '"><img class="f" alt="" src="' + src + '"><i class="bar"></i><span class="l">Prima</span><span class="r">Effetto 4K</span></div><div class="mm-hdhint">Trascina sull\'immagine per confrontare</div>';
+        };
+        window.mmHdWire = () => {
+            apply();
+            document.querySelectorAll('.mm-hdprev').forEach((pv) => {
+                const set = (x) => { const r = pv.getBoundingClientRect(); pv.style.setProperty('--x', Math.max(4, Math.min(96, (x - r.left) / r.width * 100)) + '%'); };
+                let on = false;
+                pv.addEventListener('pointerdown', (e) => { on = true; set(e.clientX); try { pv.setPointerCapture(e.pointerId); } catch (er) {} });
+                pv.addEventListener('pointermove', (e) => { if (on) set(e.clientX); });
+                pv.addEventListener('pointerup', () => { on = false; });
+                pv.addEventListener('pointercancel', () => { on = false; });
+            });
+        };
+        apply();
     })();
+
+    if (typeof window.showProfile === 'function') {
+        const _sp = window.showProfile;
+        window.showProfile = function () { const r = _sp.apply(this, arguments); try { if (window.mmHdWire) mmHdWire(); } catch (e) {} return r; };
+    }
 
     // Traccia se l'utente ha interagito di recente (click/touch)
     let userInteracting = false;
@@ -5437,7 +5501,7 @@
             // poi l'immagine originale, nitidissima, quando e' pronta
             const needW = (ak === 'backdrop' && k === 'poster' ? r.height * 16 / 9 : r.width) * Math.min(window.devicePixelRatio || 1, 3);
             const cn = navigator.connection;
-            if (isWide() && needW > 1350 && !/\/original\//.test(hd) && !(cn && (cn.saveData || /(^|-)2g/.test(cn.effectiveType || '')))) {
+            if (needW > 1350 && !/\/original\//.test(hd) && !(cn && (cn.saveData || /(^|-)2g/.test(cn.effectiveType || '')))) {
                 const orig = 'https://image.tmdb.org/t/p/original' + p, oim = new Image();
                 oim.decoding = 'async';
                 oim.src = orig;
@@ -6165,26 +6229,36 @@
         // v32: prima un secondo gesto fatto mentre il primo "scivolava" ancora
         // (inerzia del touchpad) veniva ignorato: ora un nuovo colpo si riconosce
         // perche' la spinta torna a crescere invece di calare
-        // v34: un nuovo colpo si riconosce solo se la spinta risale per due eventi di
-        // fila, ravvicinati e nella stessa direzione. Un "salto" dovuto a un attimo di
-        // blocco della pagina (eventi accumulati) non conta piu' come secondo gesto
-        let hAcc = 0, hLocked = false, hIdle = null, hMin = 0, hAt = 0, hDir = 0, hPrevA = 0, hPrevT = 0, hRise = 0;
+        // v35: i gesti si leggono dalla VELOCITA' (spinta per fotogramma), non dal
+        // numero grezzo: quando il PC rallenta e il browser accorpa piu' eventi in uno
+        // solo, la velocita' resta quella vera e non sembra un secondo colpo. Dopo un
+        // cambio c'e' una breve pausa (inerzia del touchpad); poi un nuovo colpo
+        // passa subito se la spinta risale, se cambia verso o se il dito si era fermato
+        let hAcc = 0, hLocked = false, hAt = 0, hPrevT = 0, hVmin = 0, hVprev = 0, hDirL = 0, hPeak = 0, hDip = false;
         heroEl.addEventListener('wheel', (e) => {
             if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
             e.preventDefault();
-            const a = Math.abs(e.deltaX), now = performance.now(), gap = now - hPrevT, dir = e.deltaX > 0 ? 1 : -1;
-            clearTimeout(hIdle);
-            hIdle = setTimeout(() => { hLocked = false; hAcc = 0; hRise = 0; }, 200);
+            const now = performance.now(), gap = hPrevT ? now - hPrevT : 1e9;
+            hPrevT = now;
+            const dx = e.deltaMode === 1 ? e.deltaX * 16 : e.deltaX, a = Math.abs(dx), dir = dx > 0 ? 1 : -1;
+            const v = a * 16 / Math.min(Math.max(gap, 8), 250);
+            const since = now - hAt, prevV = hVprev;
+            hVprev = v;
             if (hLocked) {
-                const rising = now - hAt > 420 && gap < 60 && a > hMin * 2 + 6 && a > hPrevA * 1.15;
-                hRise = rising ? hRise + 1 : 0;
-                hPrevA = a; hPrevT = now;
-                if (hRise >= 2) { hLocked = false; hAcc = 0; hRise = 0; }
-                else { hMin = Math.min(hMin, a); return; }
-            } else { hPrevA = a; hPrevT = now; }
+                // dito fermo da un po': questo evento apre un gesto nuovo
+                if (gap > 400) { hLocked = false; hAcc = 0; }
+            }
+            if (hLocked) {
+                // subito dopo il cambio (e finche' il dito accelera, senza essere mai calato) e' lo stesso gesto
+                if (dir === hDirL) { hPeak = Math.max(hPeak, v); if (v < hPeak * 0.6) hDip = true; }
+                if (since < 260 || (since < 600 && !hDip && v >= prevV && dir === hDirL)) { hVmin = v; return; }
+                const fresh = dir !== hDirL ? v > 4 : v > hVmin * 2 + 6;
+                if (!fresh) { hVmin = Math.min(hVmin, v); return; }
+                hLocked = false; hAcc = 0;
+            } else if (gap > 400) hAcc = 0;
             if (hAcc && Math.sign(hAcc) !== dir) hAcc = 0;
-            hAcc += e.deltaX;
-            if (Math.abs(hAcc) > 36) { hDir = dir; goHeroSlide(_heroIdx + hDir, true); hLocked = true; hAt = now; hMin = a; hAcc = 0; hRise = 0; }
+            hAcc += dx;
+            if (Math.abs(hAcc) > 30) { goHeroSlide(_heroIdx + dir, true); hLocked = true; hAt = now; hVmin = v; hDirL = dir; hPeak = v; hDip = false; hAcc = 0; }
         }, { passive: false });
 
         // ── v9: righe orizzontali: il touchpad non sposta piu' la pagina in verticale ──

@@ -1232,14 +1232,28 @@
         .mm-lg-hi { position: absolute; inset: 0; background-size: cover; background-repeat: no-repeat; will-change: opacity; }
         .mm-lg-shade { position: absolute; inset: 0; will-change: opacity; }
         .mm-lg-in { position: absolute; inset: 0; transform-origin: 50% 50%; will-change: transform; }
-        /* v41: copertine in cima da PC: scorrimento a scatti del browser (invisibile) */
+        .mm-audiotip { display: none; align-items: center; gap: 12px; margin-top: 10px; padding: 11px 12px; border-radius: 14px; background: #141417; box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.1); font-size: 13.5px; line-height: 1.4; color: rgba(255,255,255,0.8); }
+        .mm-audiotip.show { display: flex; animation: mmUp .45s var(--bezier) both; }
+        .mm-audiotip > i { font-size: 18px; color: #ff6b73; }
+        .mm-audiotip span { flex: 1; min-width: 0; }
+        .mm-audiotip b { color: #fff; }
+        .mm-audiotip button { flex: 0 0 auto; border: 0; border-radius: 99px; padding: 8px 14px; background: rgba(255,255,255,0.12); color: #fff; font: 700 12.5px var(--sora, inherit); cursor: pointer; }
+        /* v42: copertine in cima da PC: un carosello vero del browser. Mentre muovi le dita
+           sul touchpad le copertine scorrono con il movimento; al rilascio si fermano sempre
+           sulla copertina vicina (una alla volta). Testo e pulsanti restano fermi */
         .hero-banner.mm-snap.show { display: flex; }
-        .hero-banner.mm-snap { overflow-x: scroll; overflow-y: hidden; scroll-snap-type: none; overscroll-behavior-x: contain; scrollbar-width: none; touch-action: pan-x pan-y; }
+        .hero-banner.mm-snap { overflow-x: scroll; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; }
         .hero-banner.mm-snap::-webkit-scrollbar { display: none; }
         .hero-banner.mm-snap::after { content: none; }
-        .hero-banner.mm-snap > .hero-frame { position: sticky; left: 0; top: auto; right: auto; bottom: auto; flex: 0 0 100%; width: 100%; height: 100%; scroll-snap-align: start; }
+        .hero-banner.mm-snap > .hero-frame { position: sticky; left: 0; top: auto; right: auto; bottom: auto; flex: 0 0 100%; width: 100%; height: 100%; scroll-snap-align: start; scroll-snap-stop: always; }
         .hero-banner.mm-snap > .hero-frame::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: var(--mm-hgrad, none); }
-        .hero-banner.mm-snap > .mm-snapgap { flex: 0 0 45%; height: 1px; pointer-events: none; }
+        .hero-banner.mm-snap > .mm-snapgap { flex: 0 0 100%; height: 1px; scroll-snap-align: start; scroll-snap-stop: always; pointer-events: none; }
+        .hero-banner.mm-snap .mm-pan { position: absolute; inset: 0; }
+        .hero-banner.mm-snap .mm-pan.tl { animation: mmHeroPan linear both; animation-timeline: scroll(nearest x); }
+        @keyframes mmHeroPan { from { translate: var(--pan-from, 0%) 0; } to { translate: var(--pan-to, 0%) 0; } }
+        .hero-banner.mm-snap .hero-slide { right: auto; width: 100%; }
+        .hero-banner.mm-snap .hero-slide.mm-nb { visibility: visible; opacity: 1; transition: none; }
+        .hero-banner.mm-snap .hero-slide.mm-nb:not(.mm-zin):not(.mm-z0) { transform: scale(1.14); }
         /* v40: in volo l'immagine e' intera (larga), la cornice la ritaglia: niente bordi neri */
         .mm-lg-in.mm-wide > .mm-lg-lo, .mm-lg-in.mm-wide > .mm-lg-hi { left: -100% !important; right: auto !important; width: 300% !important; height: 100% !important; object-fit: contain !important; object-position: center !important; background-size: contain !important; background-position: center !important; }
         .modal-hero.mm-flywide img.mh-lo, .modal-hero.mm-flywide .mh-hi { left: -100% !important; right: auto !important; width: 300% !important; top: 0 !important; bottom: auto !important; height: 100% !important; object-fit: contain !important; object-position: center !important; background-size: contain !important; background-position: center !important; }
@@ -3674,6 +3688,8 @@
                 window._mmLang = ol;
                 try { document.getElementById('watchNowBtn').onclick(); } finally { window._mmLang = null; }
                 markPlayerSourceClicked('watchOriginalBtn');
+                // v42: su iPhone il lettore di Apple sceglie l'audio nella lingua del telefono
+                if (ol !== 'it' && window.mmAudioTip) mmAudioTip();
                 return;
             }
             markPlayerSourceClicked('watchOriginalBtn');
@@ -5232,46 +5248,133 @@
         }, true);
     })();
 
-    // v41: copertine in cima da PC: il gesto del touchpad lo legge il browser
-    (function mmHeroSnap() {
+    // v42: su iPhone/iPad il video lo riproduce il lettore di Apple, che sceglie la traccia
+    // audio nella lingua del telefono (italiano) anche se il player indica l'inglese: un
+    // avviso spiega come passare all'inglese. Su PC parte gia' in inglese
+    (function mmAudioTipInit() {
+        const ua = navigator.userAgent || '';
+        const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const wrap = document.getElementById('videoPlayerWrap');
+        if (!ios || !wrap) { window.mmAudioTip = () => {}; return; }
+        const tip = document.createElement('div');
+        tip.className = 'mm-audiotip';
+        tip.innerHTML = '<i class="fa-solid fa-language"></i><span>Se senti l\'italiano: nel player tocca <b><i class="fa-solid fa-gear"></i></b>, poi <b>Audio</b> e scegli <b>English</b>.</span><button type="button">Ok</button>';
+        tip.querySelector('button').addEventListener('click', () => tip.classList.remove('show'));
+        wrap.appendChild(tip);
+        window.mmAudioTip = () => { tip.classList.add('show'); clearTimeout(tip._t); tip._t = setTimeout(() => tip.classList.remove('show'), 20000); };
+        const vp = document.getElementById('videoPlayer');
+        if (vp) new MutationObserver(() => { if (!vp.querySelector('iframe')) tip.classList.remove('show'); }).observe(vp, { childList: true });
+    })();
+
+    // v42: copertine in cima da PC: carosello del browser che segue le dita sul touchpad
+    (function mmHeroPan() {
         if (!(window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches)) return;
         const hero = document.getElementById('heroBanner');
         if (!hero || !('onscroll' in hero)) return;
-        let fired = false, settleT = null, resetting = false;
+        const tl = !!(window.CSS && CSS.supports && CSS.supports('animation-timeline: scroll()'));
+        let P = 5, c = 2, base = 0, live = 0, settleT = null, layT = null, resetting = false;
         const W = () => hero.clientWidth || window.innerWidth;
-        const mid = () => Math.round(Math.max(0, hero.scrollWidth - hero.clientWidth) / 2);
-        const center = () => {
-            resetting = true;
-            hero.scrollLeft = mid();
-            fired = false;
-            setTimeout(() => { resetting = false; }, 0);
+        const els = () => [...hero.querySelectorAll('.hero-slide')];
+        const panEl = () => hero.querySelector('.mm-pan');
+        const pagesFor = (cnt) => (cnt >= 5 ? 5 : cnt >= 3 ? 3 : 1);
+        const offOf = (k, cur, cnt) => { let d = ((k - cur) % cnt + cnt) % cnt; if (d > cnt / 2) d -= cnt; return d; };
+        const panJS = () => { const p = panEl(); if (p && !tl) p.style.translate = Math.round(c * W() - hero.scrollLeft) + 'px 0'; };
+        const wrap = () => {
+            const ss = hero.querySelector('.hero-slides');
+            if (!ss || ss.querySelector(':scope > .mm-pan')) return;
+            const p = document.createElement('div');
+            p.className = 'mm-pan' + (tl ? ' tl' : '');
+            [...ss.children].forEach((ch) => p.appendChild(ch));
+            ss.appendChild(p);
+        };
+        // ogni copertina al suo posto: quella attuale al centro, le vicine a destra e sinistra
+        const layout = () => {
+            const list = els(), cnt = list.length;
+            if (!cnt) return;
+            P = pagesFor(cnt); c = (P - 1) / 2;
+            const p = panEl();
+            if (p) { p.style.setProperty('--pan-from', (c * 100) + '%'); p.style.setProperty('--pan-to', (-c * 100) + '%'); }
+            list.forEach((sl, k) => {
+                if (sl.classList.contains('leaving')) { sl.style.left = '0%'; sl.classList.remove('mm-nb'); return; }
+                const o = k === _heroIdx ? 0 : offOf(k, _heroIdx, cnt);
+                sl.style.left = (o * 100) + '%';
+                sl.classList.toggle('mm-nb', o !== 0 && Math.abs(o) <= c);
+                if (o !== 0) sl.classList.remove('mm-zin', 'mm-z0');
+            });
+            base = _heroIdx; live = 0;
+        };
+        const center = () => { resetting = true; hero.scrollLeft = Math.round(c * W()); panJS(); setTimeout(() => { resetting = false; }, 0); };
+        const gapsFor = () => {
+            const want = pagesFor(els().length) - 1, gaps = hero.querySelectorAll(':scope > .mm-snapgap');
+            if (gaps.length === want) return;
+            gaps.forEach((g) => g.remove());
+            hero.insertAdjacentHTML('beforeend', '<div class="mm-snapgap" aria-hidden="true"></div>'.repeat(want));
+        };
+        const disable = () => {
+            if (!hero.classList.contains('mm-snap')) return;
+            hero.classList.remove('mm-snap');
+            hero.querySelectorAll(':scope > .mm-snapgap').forEach((g) => g.remove());
+            els().forEach((sl) => { sl.style.left = ''; sl.classList.remove('mm-nb'); });
+            hero.scrollLeft = 0;
         };
         const ensure = () => {
             if (!hero.querySelector(':scope > .hero-frame')) return;
-            // finestra stretta = disposizione da telefono: niente scorrimento nativo
-            if (window.innerWidth < 600) { if (hero.classList.contains('mm-snap')) { hero.classList.remove('mm-snap'); hero.querySelectorAll(':scope > .mm-snapgap').forEach((g) => g.remove()); hero.scrollLeft = 0; } return; }
+            if (window.innerWidth < 600) { disable(); return; }
             if (!hero.classList.contains('mm-snap')) {
                 try { const g = getComputedStyle(hero, '::after').backgroundImage; if (g && g !== 'none') hero.style.setProperty('--mm-hgrad', g); } catch (e) {}
                 hero.classList.add('mm-snap');
             }
-            if (!hero.querySelector(':scope > .mm-snapgap')) hero.insertAdjacentHTML('beforeend', '<div class="mm-snapgap" aria-hidden="true"></div><div class="mm-snapgap" aria-hidden="true"></div>');
-            if (Math.abs(hero.scrollLeft - mid()) > 1) center();
+            wrap(); gapsFor(); layout(); center();
         };
-        const settle = () => { if (Math.abs(hero.scrollLeft - mid()) > 1) center(); else fired = false; };
+        // durante il gesto: la copertina che passa a meta' diventa quella attuale (testo compreso)
+        const liveSet = (idx) => {
+            const list = els(), cnt = list.length;
+            idx = ((idx % cnt) + cnt) % cnt;
+            if (idx === _heroIdx) return;
+            const old = list[_heroIdx];
+            if (old) { old.classList.add('mm-nb'); old.classList.remove('active'); }
+            _heroIdx = idx; _heroElapsed = 0;
+            const inc = list[idx];
+            inc.classList.remove('leaving');
+            inc.classList.add('active');
+            if (!inc.classList.contains('mm-zin') && !inc.classList.contains('mm-z0')) inc.classList.add('mm-zin');
+            mmPrimeSlide(idx); mmPrimeSlide(idx + 1); mmPrimeSlide(idx - 1); mmPrimeSlide(idx + 2, true);
+            renderHeroContent(true);
+            startHeroTimer();
+        };
+        const settle = () => {
+            const w = W(), pg = Math.round(hero.scrollLeft / w);
+            if (Math.abs(hero.scrollLeft - pg * w) > 2 && (settle.n = (settle.n || 0) + 1) < 6) { clearTimeout(settleT); settleT = setTimeout(settle, 100); return; }
+            settle.n = 0;
+            layout(); center();
+        };
         hero.addEventListener('scroll', () => {
+            panJS();
             if (resetting) return;
-            const d = hero.scrollLeft - mid();
-            if (!fired && Math.abs(d) > W() * 0.14) {
-                fired = true;
-                if (typeof goHeroSlide === 'function') goHeroSlide(_heroIdx + (d > 0 ? 1 : -1), true);
-            }
+            const pg = Math.round(hero.scrollLeft / W()) - c;
+            if (pg !== live) { live = pg; liveSet(base + pg); }
             clearTimeout(settleT);
-            settleT = setTimeout(settle, 140);
+            settleT = setTimeout(settle, 160);
         }, { passive: true });
         hero.addEventListener('scrollend', () => { clearTimeout(settleT); settle(); });
+        // frecce, tasti, cambio automatico: dissolvenza come sempre, poi tutto torna al suo posto
+        const og = window.goHeroSlide;
+        if (typeof og === 'function') window.goHeroSlide = function (i, byUser) {
+            if (!hero.classList.contains('mm-snap')) return og.apply(this, arguments);
+            const list = els(), cnt = list.length;
+            if (cnt) {
+                const ni = ((i % cnt) + cnt) % cnt, inc = list[ni], old = list[_heroIdx];
+                if (inc && ni !== _heroIdx) { inc.classList.remove('mm-nb'); inc.style.left = '0%'; }
+                if (old) old.classList.remove('mm-nb');
+            }
+            const r = og.apply(this, arguments);
+            layout();
+            clearTimeout(layT); layT = setTimeout(layout, 1250);
+            return r;
+        };
         new MutationObserver(ensure).observe(hero, { childList: true });
         new MutationObserver(() => { if (hero.classList.contains('show')) requestAnimationFrame(ensure); }).observe(hero, { attributes: true, attributeFilter: ['class'] });
-        window.addEventListener('resize', () => { ensure(); if (hero.classList.contains('mm-snap')) center(); }, { passive: true });
+        window.addEventListener('resize', () => { ensure(); }, { passive: true });
         ensure();
     })();
 

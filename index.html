@@ -1232,6 +1232,14 @@
         .mm-lg-hi { position: absolute; inset: 0; background-size: cover; background-repeat: no-repeat; will-change: opacity; }
         .mm-lg-shade { position: absolute; inset: 0; will-change: opacity; }
         .mm-lg-in { position: absolute; inset: 0; transform-origin: 50% 50%; will-change: transform; }
+        /* v41: copertine in cima da PC: scorrimento a scatti del browser (invisibile) */
+        .hero-banner.mm-snap.show { display: flex; }
+        .hero-banner.mm-snap { overflow-x: scroll; overflow-y: hidden; scroll-snap-type: none; overscroll-behavior-x: contain; scrollbar-width: none; touch-action: pan-x pan-y; }
+        .hero-banner.mm-snap::-webkit-scrollbar { display: none; }
+        .hero-banner.mm-snap::after { content: none; }
+        .hero-banner.mm-snap > .hero-frame { position: sticky; left: 0; top: auto; right: auto; bottom: auto; flex: 0 0 100%; width: 100%; height: 100%; scroll-snap-align: start; }
+        .hero-banner.mm-snap > .hero-frame::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: var(--mm-hgrad, none); }
+        .hero-banner.mm-snap > .mm-snapgap { flex: 0 0 45%; height: 1px; pointer-events: none; }
         /* v40: in volo l'immagine e' intera (larga), la cornice la ritaglia: niente bordi neri */
         .mm-lg-in.mm-wide > .mm-lg-lo, .mm-lg-in.mm-wide > .mm-lg-hi { left: -100% !important; right: auto !important; width: 300% !important; height: 100% !important; object-fit: contain !important; object-position: center !important; background-size: contain !important; background-position: center !important; }
         .modal-hero.mm-flywide img.mh-lo, .modal-hero.mm-flywide .mh-hi { left: -100% !important; right: auto !important; width: 300% !important; top: 0 !important; bottom: auto !important; height: 100% !important; object-fit: contain !important; object-position: center !important; background-size: contain !important; background-position: center !important; }
@@ -3618,9 +3626,9 @@
             const startTime = (cwEntry && cwEntry.resumeTime > 30) ? Math.floor(cwEntry.resumeTime) : 0;
             const autoplayParam = autoplaySetting ? 'true' : 'false';
             if (type === 'movie') {
-                embedUrl = `https://vixsrc.to/movie/${id}?autoplay=${autoplayParam}&lang=it&primaryColor=e50914&secondaryColor=330000${startTime ? '&startAt=' + startTime : ''}`;
+                embedUrl = `https://vixsrc.to/movie/${id}?autoplay=${autoplayParam}&lang=${window._mmLang || 'it'}&primaryColor=e50914&secondaryColor=330000${startTime ? '&startAt=' + startTime : ''}`;
             } else {
-                embedUrl = `https://vixsrc.to/tv/${id}/${selectedSeason}/${selectedEpisode}?autoplay=${autoplayParam}&lang=it&primaryColor=e50914&secondaryColor=330000${startTime ? '&startAt=' + startTime : ''}`;
+                embedUrl = `https://vixsrc.to/tv/${id}/${selectedSeason}/${selectedEpisode}?autoplay=${autoplayParam}&lang=${window._mmLang || 'it'}&primaryColor=e50914&secondaryColor=330000${startTime ? '&startAt=' + startTime : ''}`;
             }
             player.innerHTML = `<iframe src="${embedUrl}" frameborder="0" allowfullscreen allow="autoplay; fullscreen; encrypted-media; picture-in-picture" referrerpolicy="origin"></iframe>`;
             player.style.display = 'block';
@@ -3641,9 +3649,9 @@
             let embedUrl;
             const autoplayParam = autoplaySetting ? 'true' : 'false';
             if (type === 'movie') {
-                embedUrl = `https://vixsrc.to/movie/${id}?autoplay=${autoplayParam}&lang=it&primaryColor=e50914&secondaryColor=330000`;
+                embedUrl = `https://vixsrc.to/movie/${id}?autoplay=${autoplayParam}&lang=${window._mmLang || 'it'}&primaryColor=e50914&secondaryColor=330000`;
             } else {
-                embedUrl = `https://vixsrc.to/tv/${id}/${selectedSeason}/${selectedEpisode}?autoplay=${autoplayParam}&lang=it&primaryColor=e50914&secondaryColor=330000`;
+                embedUrl = `https://vixsrc.to/tv/${id}/${selectedSeason}/${selectedEpisode}?autoplay=${autoplayParam}&lang=${window._mmLang || 'it'}&primaryColor=e50914&secondaryColor=330000`;
             }
             player.innerHTML = `<iframe src="${embedUrl}" frameborder="0" allowfullscreen allow="autoplay; fullscreen; encrypted-media; picture-in-picture" referrerpolicy="origin"></iframe>`;
             player.style.display = 'block';
@@ -3659,6 +3667,15 @@
 
         // PLAYER Lingua originale (Cinema 16/9)
         document.getElementById('watchOriginalBtn').onclick = () => {
+            // v41: originale in inglese o italiano = stesso player di "Guarda ora" (niente
+            // pubblicita' che aprono altre pagine), con l'audio nella lingua originale
+            const ol = data && data.original_language;
+            if (ol === 'en' || ol === 'it') {
+                window._mmLang = ol;
+                try { document.getElementById('watchNowBtn').onclick(); } finally { window._mmLang = null; }
+                markPlayerSourceClicked('watchOriginalBtn');
+                return;
+            }
             markPlayerSourceClicked('watchOriginalBtn');
             _activePlayerSource = 'original';
             _langSkipTime = 0;
@@ -5215,6 +5232,49 @@
         }, true);
     })();
 
+    // v41: copertine in cima da PC: il gesto del touchpad lo legge il browser
+    (function mmHeroSnap() {
+        if (!(window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches)) return;
+        const hero = document.getElementById('heroBanner');
+        if (!hero || !('onscroll' in hero)) return;
+        let fired = false, settleT = null, resetting = false;
+        const W = () => hero.clientWidth || window.innerWidth;
+        const mid = () => Math.round(Math.max(0, hero.scrollWidth - hero.clientWidth) / 2);
+        const center = () => {
+            resetting = true;
+            hero.scrollLeft = mid();
+            fired = false;
+            setTimeout(() => { resetting = false; }, 0);
+        };
+        const ensure = () => {
+            if (!hero.querySelector(':scope > .hero-frame')) return;
+            // finestra stretta = disposizione da telefono: niente scorrimento nativo
+            if (window.innerWidth < 600) { if (hero.classList.contains('mm-snap')) { hero.classList.remove('mm-snap'); hero.querySelectorAll(':scope > .mm-snapgap').forEach((g) => g.remove()); hero.scrollLeft = 0; } return; }
+            if (!hero.classList.contains('mm-snap')) {
+                try { const g = getComputedStyle(hero, '::after').backgroundImage; if (g && g !== 'none') hero.style.setProperty('--mm-hgrad', g); } catch (e) {}
+                hero.classList.add('mm-snap');
+            }
+            if (!hero.querySelector(':scope > .mm-snapgap')) hero.insertAdjacentHTML('beforeend', '<div class="mm-snapgap" aria-hidden="true"></div><div class="mm-snapgap" aria-hidden="true"></div>');
+            if (Math.abs(hero.scrollLeft - mid()) > 1) center();
+        };
+        const settle = () => { if (Math.abs(hero.scrollLeft - mid()) > 1) center(); else fired = false; };
+        hero.addEventListener('scroll', () => {
+            if (resetting) return;
+            const d = hero.scrollLeft - mid();
+            if (!fired && Math.abs(d) > W() * 0.14) {
+                fired = true;
+                if (typeof goHeroSlide === 'function') goHeroSlide(_heroIdx + (d > 0 ? 1 : -1), true);
+            }
+            clearTimeout(settleT);
+            settleT = setTimeout(settle, 140);
+        }, { passive: true });
+        hero.addEventListener('scrollend', () => { clearTimeout(settleT); settle(); });
+        new MutationObserver(ensure).observe(hero, { childList: true });
+        new MutationObserver(() => { if (hero.classList.contains('show')) requestAnimationFrame(ensure); }).observe(hero, { attributes: true, attributeFilter: ['class'] });
+        window.addEventListener('resize', () => { ensure(); if (hero.classList.contains('mm-snap')) center(); }, { passive: true });
+        ensure();
+    })();
+
     // Traccia se l'utente ha interagito di recente (click/touch)
     let userInteracting = false;
     let interactionTimer = null;
@@ -5269,7 +5329,7 @@
     // segue un tap reale lo lasciamo passare, per non sembrare a vixsrc un blocco
     // sistematico di tutto ciò che prova ad aprirsi/reindirizzare.
     window.addEventListener('beforeunload', function(e) {
-        if (document.getElementById('videoPlayer').style.display === 'block' && !userInteracting) {
+        if (document.getElementById('videoPlayer').style.display === 'block' && (!userInteracting || _activePlayerSource === 'original')) {
             e.preventDefault();
             e.returnValue = '';
             return '';
@@ -5394,7 +5454,8 @@
         if (window.navigation && window.navigation.addEventListener) {
             window.navigation.addEventListener('navigate', (e) => {
                 try {
-                    if (!document.body.classList.contains('mm-playing') || userInteracting || !e.cancelable) return;
+                    if (!document.body.classList.contains('mm-playing') || !e.cancelable) return;
+                    if (userInteracting && _activePlayerSource !== 'original') return;
                     const to = new URL(e.destination.url);
                     if (to.origin !== location.origin) e.preventDefault();
                 } catch (err) { /* niente */ }
@@ -6344,7 +6405,10 @@
         // esaurita. Si conta solo la spinta degli ultimi 220 ms: la coda lenta
         // dell'inerzia non si accumula mai in un altro cambio
         let hLocked = false, hAt = 0, hPrevT = 0, hPrevA = 0, hDirL = 0, hRev = 0, hWin = [], hGap = 16, hCand = 0, hCandA = 0;
-        heroEl.addEventListener('wheel', (e) => {
+        // v41: sui computer con mouse/touchpad il gesto lo legge il browser (mmHeroSnap):
+        // nessun ascoltatore che lo trattenga
+        if (!(window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches)) heroEl.addEventListener('wheel', (e) => {
+            if (heroEl.classList.contains('mm-snap')) return;
             if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
             e.preventDefault();
             const now = performance.now(), gap = hPrevT ? now - hPrevT : 1e9;
@@ -6381,12 +6445,21 @@
         }, { passive: false });
 
         // ── v9: righe orizzontali: il touchpad non sposta piu' la pagina in verticale ──
-        document.addEventListener('wheel', (e) => {
-            const row = e.target.closest && e.target.closest('.home-row, .cast-row, .se-row');
-            if (!row || Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+        // v41: il controllo sta sulle singole righe (agganciato la prima volta che il mouse
+        // ci passa sopra), non su tutta la pagina: il resto della pagina scorre libero
+        const rowWheel = (e) => {
+            const row = e.currentTarget;
+            if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
             e.preventDefault();
             row.scrollLeft += e.deltaX;
-        }, { passive: false });
+        };
+        const rowHooked = new WeakSet();
+        document.addEventListener('mouseover', (e) => {
+            const row = e.target.closest && e.target.closest('.home-row, .cast-row, .se-row');
+            if (!row || rowHooked.has(row)) return;
+            rowHooked.add(row);
+            row.addEventListener('wheel', rowWheel, { passive: false });
+        }, { passive: true });
         // frecce sulle righe (computer)
         const finePointer = window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches;
         const wrapRow = (row) => {

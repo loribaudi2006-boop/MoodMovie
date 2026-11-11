@@ -1353,6 +1353,22 @@
         .mm-pnote button { flex: 0 0 auto; border: 0; border-radius: 99px; padding: 8px 14px; background: var(--red-grad, #e50914); color: #fff; font: 800 12.5px var(--sora, inherit); cursor: pointer; }
         /* offline: l'app si apre lo stesso, con la tua libreria */
         .app-offline-indicator span { white-space: nowrap; }
+        /* v31: zoom leggero quando arriva una nuova copertina */
+        .hero-slide.leaving { animation: mmHeroZout 1.1s ease both; }
+        .hero-slide.active.mm-zin { animation: mmHeroZin 1.3s cubic-bezier(.2,.7,.2,1) both; }
+        @keyframes mmHeroZin { from { transform: scale(1.08); } to { transform: none; } }
+        @keyframes mmHeroZout { from { transform: none; } to { transform: scale(1.03); } }
+        /* v31: i pallini non si ridisegnano a ogni copertina, si muove solo quello acceso */
+        .hero-content.swap > .hero-dots { animation: none; }
+        /* v31: Preferiti / Visti / Classifica: la pillola scorre e il contenuto entra di lato */
+        .lib-tabs { position: relative; isolation: isolate; }
+        .lib-pill { position: absolute; z-index: -1; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 3); border-radius: 9px; background: rgba(255,255,255,0.2); box-shadow: 0 3px 12px rgba(0,0,0,0.35); transform: translateX(calc(var(--i, 0) * 100%)); transition: transform .45s var(--spring); pointer-events: none; }
+        .lib-tabs .lib-tab.active { background: transparent; box-shadow: none; }
+        .lib-tab .lib-n { transition: background .3s, color .3s; }
+        #libContent.mm-lib-r { animation: mmLibR .38s var(--bezier) both; }
+        #libContent.mm-lib-l { animation: mmLibL .38s var(--bezier) both; }
+        @keyframes mmLibR { from { opacity: 0; transform: translateX(22px); } to { opacity: 1; transform: none; } }
+        @keyframes mmLibL { from { opacity: 0; transform: translateX(-22px); } to { opacity: 1; transform: none; } }
     </style>
 </head>
 <body>
@@ -1972,7 +1988,12 @@
         if (it.vote_average) parts.push('<span class="star"><i class="fa-solid fa-star"></i> ' + it.vote_average.toFixed(1).replace('.', ',') + '</span>');
         const isFav = favorites.some(f => f.id === it.id && f.type === mode);
         const safeTitle = title.replace(/\\/g, '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-        box.innerHTML =
+        // v31: i pallini restano gli stessi (cambia solo quello acceso, con la sua
+        // transizione); il resto del testo si ridisegna come prima
+        let dots = box.querySelector(':scope > .hero-dots');
+        if (dots && (_heroItems.length < 2 || dots.children.length !== _heroItems.length)) { dots.remove(); dots = null; }
+        Array.from(box.children).forEach((c) => { if (c !== dots) c.remove(); });
+        box.insertAdjacentHTML('afterbegin',
             '<div class="hero-kicker">N. ' + (_heroIdx + 1) + ' in tendenza \u00B7 ' + (mode === 'movie' ? 'Film' : 'Serie TV') + '</div>' +
             '<h1 class="hero-title' + (mmLogoCache[mode + it.id] ? ' has-logo' : '') + '" data-id="' + it.id + '">' + (mmLogoCache[mode + it.id] ? '<img class="hero-logo" alt="" src="' + mmLogoCache[mode + it.id] + '">' : '') + '<span class="ht">' + title + '</span></h1>' +
             '<div class="hero-meta">' + parts.join('<span class="dot">\u00B7</span>') + '</div>' +
@@ -1981,8 +2002,9 @@
               '<button class="hero-btn hero-btn-play" onclick="heroPlay(' + it.id + ',\'' + mode + '\',this)"><i class="fa-solid fa-play"></i> Guarda ora</button>' +
               '<button class="hero-btn hero-btn-icon hero-btn-fav' + (isFav ? ' active' : '') + '" aria-label="La mia lista" onclick="toggleFav(event,' + it.id + ',\'' + safeTitle + '\',\'' + it.poster_path + '\',\'' + mode + '\'); mmHeroFavIcon(this)"><i class="fa-solid ' + (isFav ? 'fa-check' : 'fa-plus') + '"></i></button>' +
               '<button class="hero-btn hero-btn-icon hero-btn-info" aria-label="Altre info" onclick="openModal(' + it.id + ',\'' + mode + '\')"><i class="fa-solid fa-info"></i></button>' +
-            '</div>' +
-            (_heroItems.length > 1 ? '<div class="hero-dots">' + _heroItems.map((_, i) => '<button class="hero-dot' + (i === _heroIdx ? ' on' : '') + '" aria-label="Titolo ' + (i + 1) + '" onclick="event.stopPropagation(); goHeroSlide(' + i + ', true)"></button>').join('') + '</div>' : '');
+            '</div>');
+        if (dots) Array.from(dots.children).forEach((d, i) => d.classList.toggle('on', i === _heroIdx));
+        else if (_heroItems.length > 1) box.insertAdjacentHTML('beforeend', '<div class="hero-dots">' + _heroItems.map((_, i) => '<button class="hero-dot' + (i === _heroIdx ? ' on' : '') + '" aria-label="Titolo ' + (i + 1) + '" onclick="event.stopPropagation(); goHeroSlide(' + i + ', true)"></button>').join('') + '</div>');
         if (animate) { box.classList.remove('swap'); void box.offsetWidth; box.classList.add('swap'); }
         mmAmbient(it);
         if (!((mode + it.id) in mmLogoCache)) mmFetchLogo(mode, it.id).then((logo) => {
@@ -2032,10 +2054,11 @@
         if (i === _heroIdx) return;
         const slides = document.querySelectorAll('#heroBanner .hero-slide');
         const out = slides[_heroIdx];
-        if (out) { out.classList.add('leaving'); out.classList.remove('active'); setTimeout(() => out.classList.remove('leaving'), 1200); }
+        if (out) { out.classList.remove('mm-zin'); out.classList.add('leaving'); out.classList.remove('active'); setTimeout(() => out.classList.remove('leaving'), 1200); }
         _heroIdx = i;
         mmPrimeSlide(i); mmPrimeSlide(i + 1);
-        if (slides[_heroIdx]) slides[_heroIdx].classList.add('active');
+        const inc = slides[_heroIdx];
+        if (inc) { inc.classList.remove('mm-zin'); void inc.offsetWidth; inc.classList.add('active', 'mm-zin'); }
         renderHeroContent(true);
         if (byUser) startHeroTimer();
     }
@@ -4179,14 +4202,36 @@
         const set = (id, n) => { const e = document.querySelector('.lib-tab[data-tab="' + id + '"] .lib-n'); if (e) e.textContent = n; };
         set('favs', favorites.length); set('watched', watchedMovies.length); set('ranking', rankingMovies.length);
     }
+    const MM_LIB_ORDER = ['favs', 'watched', 'ranking'];
     function renderLibrary(tab) {
         if (tab !== 'watched' && tab !== 'ranking') tab = 'favs';
+        const prev = libActiveTab;
         if (tab !== libActiveTab) _libShown = 30;
         libActiveTab = tab;
         const grid = document.getElementById('movieGrid');
+        // v31: cambio scheda dentro la Libreria gia' aperta: le schede restano
+        // (la pillola scorre fino alla nuova) e il contenuto entra dal lato giusto
+        const oldTabs = grid.classList.contains('lib-container') && grid.querySelector('.lib-tabs .lib-pill');
+        const oldContent = document.getElementById('libContent');
+        if (oldTabs && oldContent && prev !== tab) {
+            const tabs = oldTabs.parentNode;
+            tabs.querySelectorAll('.lib-tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === tab));
+            tabs.style.setProperty('--i', MM_LIB_ORDER.indexOf(tab));
+            mmUpdateLibCounts();
+            const content = document.createElement('div');
+            content.id = 'libContent';
+            content.className = MM_LIB_ORDER.indexOf(tab) > MM_LIB_ORDER.indexOf(prev) ? 'mm-lib-r' : 'mm-lib-l';
+            content.addEventListener('animationend', () => { content.className = ''; }, { once: true });
+            oldContent.replaceWith(content);
+            if (tab === 'watched') renderWatchedTab(content);
+            else if (tab === 'ranking') renderRankingTab(content);
+            else renderFavsTab(content);
+            return;
+        }
         grid.className = 'lib-container';
         grid.innerHTML = `
-          <div class="lib-tabs">
+          <div class="lib-tabs" style="--i:${MM_LIB_ORDER.indexOf(tab)}">
+            <span class="lib-pill"></span>
             ${mmLibTab('favs', 'Preferiti', favorites.length, tab)}
             ${mmLibTab('watched', 'Visti', watchedMovies.length, tab)}
             ${mmLibTab('ranking', 'Classifica', rankingMovies.length, tab)}

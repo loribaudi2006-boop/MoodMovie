@@ -948,6 +948,8 @@
             .hero-banner { cursor: grab; } .hero-banner:active { cursor: grabbing; }
         }
         .home-section { content-visibility: auto; contain-intrinsic-size: auto 300px; }
+        /* v45: PC: i numeri al neon della classifica si disegnano una volta sola e poi scorrono */
+        @media (hover: hover) and (pointer: fine) { svg.top10-num { will-change: transform; } }
         .home-section.mm-top10, .home-section:first-child { content-visibility: visible; }
 
         /* ── computer: spazi e proporzioni dedicate ── */
@@ -1848,6 +1850,23 @@
         if (!list.length) return null;
         list.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0) || (b.vote_count || 0) - (a.vote_count || 0) || b.width - a.width);
         return list[0].file_path;
+    };
+    // v45: immagine della scheda: tra quelle senza scritte, una abbastanza grande per lo
+    // schermo (alcune su TMDB esistono solo piccole, 1673 o 1920 px, e sul telefono si
+    // vedevano sgranate). Se nessuna basta, sul telefono va la locandina originale.
+    // null = usa la locandina
+    window.mmSheetPick = function (data) {
+        if (!data) return null;
+        const bd = (data.images && data.images.backdrops) || [];
+        const r = mmSheetHeroRect();
+        const tall = r.width / r.height < 0.9;
+        const need = (tall ? r.height * 16 / 9 : Math.max(r.width, r.height * 16 / 9)) * Math.min(window.devicePixelRatio || 1, 3);
+        const list = bd.filter((p) => (p.iso_639_1 == null || p.iso_639_1 === 'xx') && p.width >= 1000);
+        list.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0) || (b.vote_count || 0) - (a.vote_count || 0) || b.width - a.width);
+        const pick = list.find((p) => p.width >= need / 1.2) || list.reduce((m, p) => (!m || p.width > m.width ? p : m), null);
+        if (pick) return tall && data.poster_path && need / pick.width > 1.45 ? null : pick.file_path;
+        if (tall && data.poster_path) { const db = bd.find((b) => b.file_path === data.backdrop_path); if (db && need / db.width > 1.45) return null; }
+        return data.backdrop_path || null;
     };
     window.mmPickLogo = function (logos) {
         if (!logos || !logos.length) return null;
@@ -5727,7 +5746,7 @@
             if (k === 'poster' && !data.poster_path) k = 'backdrop';
             if (k === 'backdrop' && !data.backdrop_path) k = 'poster';
             let p = k === 'poster' ? data.poster_path : data.backdrop_path, ak = k, clean = k === 'backdrop';
-            const tl = mmPickTextless(data.images && data.images.backdrops) || data.backdrop_path;
+            const tl = mmSheetPick(data);
             if (tl) { p = tl; ak = 'backdrop'; clean = true; }
             const low = 'https://image.tmdb.org/t/p/' + (k === 'poster' ? 'w342' + data.poster_path : 'w780' + p);
             const hd = ak === 'backdrop' && k === 'poster' ? mmImg(p, 'backdrop', r.height * 16 / 9, r.height) : mmImg(p, ak, r.width, r.height);
@@ -5735,14 +5754,15 @@
             mHero.dataset.hd = hd;
             mmHeroLayers(hd, low, modal.classList.contains('mm-pre'), ak !== k ? 'center' : '');
             // poi l'immagine originale, nitidissima, quando e' pronta
-            const needW = (ak === 'backdrop' && k === 'poster' ? r.height * 16 / 9 : r.width) * Math.min(window.devicePixelRatio || 1, 3);
+            const needW = (ak === 'backdrop' ? (k === 'poster' ? r.height * 16 / 9 : Math.max(r.width, r.height * 16 / 9)) : Math.max(r.width, r.height * 2 / 3)) * Math.min(window.devicePixelRatio || 1, 3);
+            const hdW = /\/original\//.test(hd) ? 1e9 : +((/\/w(\d+)\//.exec(hd) || [])[1] || 0);
             const cn = navigator.connection;
-            if (needW > 1350 && !/\/original\//.test(hd) && !(cn && (cn.saveData || /(^|-)2g/.test(cn.effectiveType || '')))) {
+            if (hdW < needW * 0.95 && !(cn && (cn.saveData || /(^|-)2g/.test(cn.effectiveType || '')))) {
                 const orig = 'https://image.tmdb.org/t/p/original' + p, oim = new Image();
                 oim.decoding = 'async';
                 oim.src = orig;
                 const up = () => { if (window._mmSheet && window._mmSheet.data === data && (modal.classList.contains('open') || modal.classList.contains('mm-pre'))) mmHeroLayers(orig, low, true, ak !== k ? 'center' : ''); };
-                if (oim.decode) oim.decode().then(up, () => {}); else oim.onload = up;
+                if (oim.decode) oim.decode().then(up, () => { if (oim.complete && oim.naturalWidth) up(); else oim.onload = up; }); else oim.onload = up;
             }
             // logo ufficiale al posto del titolo (solo con l'immagine larga)
             const title = document.getElementById('modalTitle');
@@ -6771,7 +6791,7 @@
             preJson.set(u, pj);
             // v34: appena arrivano i dati, il telefono scarica gia' l'immagine della scheda
             if (window.innerWidth < 600) pj.then((data) => {
-                const ip = data && (mmPickTextless(data.images && data.images.backdrops) || data.backdrop_path);
+                const ip = data && mmSheetPick(data);
                 if (!ip) return;
                 const im = new Image(); im.decoding = 'async'; im.fetchPriority = 'high';
                 im.src = 'https://image.tmdb.org/t/p/w780' + ip;
@@ -6788,7 +6808,7 @@
             if (!jp) return;
             jp.then((data) => {
                 if (!data || !modal.classList.contains('mm-pre') || modal.classList.contains('mm-landed')) return;
-                const p = mmPickTextless(data.images && data.images.backdrops) || data.backdrop_path;
+                const p = mmSheetPick(data);
                 if (!p) return;
                 const r = mmSheetHeroRect();
                 const hd = mmImg(p, 'backdrop', r.height * 16 / 9, r.height);
@@ -7034,7 +7054,7 @@
                 if (!jp) return;
                 jp.then((data) => {
                     if (!data) return;
-                    const p = mmPickTextless(data.images && data.images.backdrops) || data.backdrop_path;
+                    const p = mmSheetPick(data);
                     const r = mmSheetHeroRect();
                     if (deep) {
                         if (p && r.width * Math.min(window.devicePixelRatio || 1, 3) > 1350) pre('https://image.tmdb.org/t/p/original' + p);
@@ -7092,7 +7112,7 @@
                     if (!data) return;
                     const r = mmSheetHeroRect();
                     // la stessa immagine che la scheda mostrera'
-                    const tl = mmPickTextless(data.images && data.images.backdrops) || data.backdrop_path;
+                    const tl = mmSheetPick(data);
                     if (tl) { const hd = mmImg(tl, 'backdrop', r.height * 16 / 9, r.height); pre(hd); mmTint(tl, () => {}); (window.mmArt = window.mmArt || {})[type + id] = { p: tl, hd }; }
                     else if (data.poster_path) pre(mmImg(data.poster_path, 'poster', r.width, r.height));
                     if (data.poster_path) pre('https://image.tmdb.org/t/p/w342' + data.poster_path);
